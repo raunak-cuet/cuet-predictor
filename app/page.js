@@ -167,16 +167,17 @@ export default function Home() {
           {/* STEP 2 */}
           <Step n={2} title="NTA normalised scores" subtitle="Enter the exact score from your scorecard. Decimals supported.">
             {subjectsTaken.length === 0 ? (
-              <EmptyState icon="⬆️" text="Select subjects in Step 1 to enter scores here." />
+              <EmptyState text="Select subjects in Step 1 to enter your scores here." />
             ) : (
-              <div className="grid sm:grid-cols-2 gap-2.5">
+              <div className="grid sm:grid-cols-2 gap-2.5 min-w-0">
                 {subjectsTaken.map(code => {
-                  const s = SUBJECT_BY_CODE[code]; if (!s) return null;
+                  const s = SUBJECT_BY_CODE[code];
+                  if (!s) return null;
                   const v = scores[code];
                   return (
-                    <div key={code} className="group relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition px-3 py-2.5">
-                      <div className="flex items-center gap-3">
-                        <div className="font-mono text-[10px] text-slate-400 tabular-nums">{code}</div>
+                    <div key={code} className="group relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition px-3 py-2.5 min-w-0 overflow-hidden">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="font-mono text-[10px] text-slate-400 tabular-nums shrink-0">{code}</div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-slate-900 truncate">{s.name}</div>
                           <div className="text-[10px] uppercase tracking-wider text-slate-400">{s.group}</div>
@@ -184,7 +185,7 @@ export default function Home() {
                         <input type="number" min="0" max="250" step="0.0001"
                           value={v ?? ''} onChange={(e) => onScore(code, e.target.value)}
                           placeholder="0–250"
-                          className={`w-24 text-right tabular-nums px-3 py-1.5 rounded-lg border bg-slate-50
+                          className={`shrink-0 w-20 sm:w-24 text-right tabular-nums px-3 py-1.5 rounded-lg border bg-slate-50
                             ${typeof v === 'number' ? 'border-emerald-300 bg-emerald-50/40 text-emerald-900 font-semibold' : 'border-slate-200'}`} />
                       </div>
                     </div>
@@ -363,10 +364,16 @@ function SubjectGroup({ title, list, selected, toggle, accent }) {
   );
 }
 
-function EmptyState({ icon, text }) {
+function EmptyState({ text }) {
   return (
     <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-6 text-sm text-slate-500 text-center">
-      <div className="text-2xl mb-1">{icon}</div>{text}
+      <div className="mx-auto mb-2 h-8 w-8 rounded-full bg-slate-200/70 grid place-items-center text-slate-500" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 19V5" />
+          <path d="M5 12l7-7 7 7" />
+        </svg>
+      </div>
+      {text}
     </div>
   );
 }
