@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SUBJECT_BY_CODE } from '@/lib/subjects';
 
 export default function AdminPage() {
@@ -13,8 +14,8 @@ export default function AdminPage() {
   const [filterCat, setFilterCat] = useState('ALL');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('DATE');
-  const [selected, setSelected] = useState(null);          // entry currently shown in detail modal
-  const [confirmDel, setConfirmDel] = useState(null);      // { kind: 'one'|'all', id? }
+  const [selected, setSelected] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
   async function login(e) {
@@ -44,24 +45,38 @@ export default function AdminPage() {
   async function doDelete() {
     if (!confirmDel) return;
     setDeleting(true);
+    let response, json;
     try {
       const body = confirmDel.kind === 'all'
         ? { password: pwd, all: true }
         : { password: pwd, ids: [confirmDel.id] };
-      const r = await fetch('/api/admin/delete', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+
+      response = await fetch('/api/admin/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const j = await r.json();
-      if (!r.ok) { alert('Delete failed: ' + (j.error || 'unknown error')); setDeleting(false); return; }
+
+      // Parse JSON safely — even if response is empty
+      try { json = await response.json(); }
+      catch { json = { error: `Server returned ${response.status} with no JSON body` }; }
+
+      if (!response.ok) {
+        console.error('[delete] Server error:', response.status, json);
+        alert(`Delete failed (HTTP ${response.status}):\n${json.error || 'Unknown error'}`);
+        setDeleting(false);
+        return;
+      }
+
       // Optimistic UI update
       if (confirmDel.kind === 'all') setEntries([]);
       else setEntries(prev => prev.filter(e => e.id !== confirmDel.id));
       if (selected?.id === confirmDel.id) setSelected(null);
       setConfirmDel(null);
       await refresh();
-    } catch {
-      alert('Network error while deleting');
+    } catch (networkError) {
+      console.error('[delete] Network exception:', networkError);
+      alert(`Could not reach the server. Detail: ${networkError.message || networkError}`);
     }
     setDeleting(false);
   }
@@ -87,7 +102,6 @@ export default function AdminPage() {
   }, [entries, filterCat, search, sort]);
 
   function downloadCSV() {
-    // CSV: identity columns + all subjects + summary — for admin export only
     const allCodes = Array.from(new Set(entries.flatMap(e => Object.keys(e.scores || {})))).sort();
     const baseHeaders = ['created_at', 'name', 'category', 'dream_label', 'composite_top', 'dream_probability'];
     const subjectHeaders = allCodes.map(c => `${c}_${(SUBJECT_BY_CODE[c]?.name || c).replace(/[^\w]/g, '').slice(0, 12)}`);
@@ -144,7 +158,6 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KPI label="Total submissions" value={summary?.total ?? 0} accent="indigo" />
         <KPI label="Today" value={summary?.today ?? 0} accent="emerald" />
@@ -152,7 +165,6 @@ export default function AdminPage() {
         <KPI label="Top dream pick" value={summary?.popular || '—'} small accent="rose" />
       </div>
 
-      {/* Filters + table */}
       <div className="card p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <input value={search} onChange={(e) => setSearch(e.target.value)}
@@ -230,30 +242,61 @@ export default function AdminPage() {
         <p className="mt-3 text-[11px] text-slate-400">Click any row for an in-depth analysis of that student.</p>
       </div>
 
-      {/* ===== Detail modal ===== */}
+      {/* PORTAL the modals to <body> so they escape the navbar's stacking context */}
       {selected && (
-        <DetailModal entry={selected} onClose={() => setSelected(null)} />
+        <PortalModal onClose={() => setSelected(null)}>
+          <DetailModalBody entry={selected} onClose={() => setSelected(null)} />
+        </PortalModal>
       )}
 
-      {/* ===== Confirm-delete modal ===== */}
       {confirmDel && (
-        <ConfirmModal
-          kind={confirmDel.kind}
-          name={confirmDel.name}
-          count={confirmDel.kind === 'all' ? entries.length : 1}
-          onCancel={() => setConfirmDel(null)}
-          onConfirm={doDelete}
-          busy={deleting}
-        />
+        <PortalModal onClose={deleting ? null : () => setConfirmDel(null)} maxWidthClass="max-w-md">
+          <ConfirmModalBody
+            kind={confirmDel.kind}
+            name={confirmDel.name}
+            count={confirmDel.kind === 'all' ? entries.length : 1}
+            onCancel={() => setConfirmDel(null)}
+            onConfirm={doDelete}
+            busy={deleting}
+          />
+        </PortalModal>
       )}
     </div>
   );
 }
 
 /* ===================================================================
-   DETAIL MODAL — Click a row → see full student analysis
+   PORTAL MODAL WRAPPER — rendered into <body>, covers entire viewport
    =================================================================== */
-function DetailModal({ entry, onClose }) {
+function PortalModal({ children, onClose, maxWidthClass = 'max-w-3xl' }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    // Lock body scroll while modal is open
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="modal-fullscreen" onClick={onClose || undefined}>
+      <div
+        className={`card-solid w-full ${maxWidthClass} max-h-[90vh] overflow-y-auto shadow-2xl`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ===================================================================
+   DETAIL MODAL BODY — the actual content shown for a student
+   =================================================================== */
+function DetailModalBody({ entry, onClose }) {
   const scores = entry.scores || {};
   const codes = (entry.subjects_taken && entry.subjects_taken.length) ? entry.subjects_taken : Object.keys(scores);
   const subjItems = codes.map(c => ({
@@ -264,118 +307,107 @@ function DetailModal({ entry, onClose }) {
   })).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="card-solid max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="p-6 sm:p-7">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-slate-200">
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Student detail</div>
-              <h2 className="font-display text-3xl text-slate-900 mt-1">
-                {entry.name || <span className="italic text-slate-400">anonymous</span>}
-              </h2>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="badge badge-good">{entry.category}</span>
-                <span className="text-slate-500">{new Date(entry.created_at).toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-            <button onClick={onClose} className="btn-ghost px-3 py-1.5 text-sm">Close ×</button>
+    <div className="p-6 sm:p-7">
+      <div className="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-slate-200">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Student detail</div>
+          <h2 className="font-display text-3xl text-slate-900 mt-1">
+            {entry.name || <span className="italic text-slate-400">anonymous</span>}
+          </h2>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="badge badge-good">{entry.category}</span>
+            <span className="text-slate-500">{new Date(entry.created_at).toLocaleString('en-IN')}</span>
           </div>
+        </div>
+        <button onClick={onClose} className="btn-ghost px-3 py-1.5 text-sm">Close ×</button>
+      </div>
 
-          {/* Key results */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-            <Tile label="Composite score" value={entry.composite_top?.toFixed(2) ?? '—'} sub="best of any eligible program" />
-            <Tile label="Subjects taken" value={codes.length} sub="CUET papers attempted" />
-            <Tile label="Dream probability" value={entry.dream_probability != null ? `${entry.dream_probability}%` : '—'} sub="for selected dream" />
-          </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        <Tile label="Composite score" value={entry.composite_top?.toFixed(2) ?? '—'} sub="best of any eligible program" />
+        <Tile label="Subjects taken" value={codes.length} sub="CUET papers attempted" />
+        <Tile label="Dream probability" value={entry.dream_probability != null ? `${entry.dream_probability}%` : '—'} sub="for selected dream" />
+      </div>
 
-          {/* Dream */}
-          <Section title="Dream college selection">
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-              {entry.dream_label ? (
-                <>
-                  <div className="text-sm font-semibold text-slate-900">{entry.dream_label}</div>
-                  {entry.dream_probability != null && (
-                    <div className="mt-1 text-xs text-amber-900">
-                      Estimated admission probability: <b>{entry.dream_probability}%</b>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-sm text-slate-500 italic">No dream college selected — student opted to see all rankings.</div>
+      <Section title="Dream college selection">
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+          {entry.dream_label ? (
+            <>
+              <div className="text-sm font-semibold text-slate-900">{entry.dream_label}</div>
+              {entry.dream_probability != null && (
+                <div className="mt-1 text-xs text-amber-900">
+                  Estimated admission probability: <b>{entry.dream_probability}%</b>
+                </div>
               )}
-            </div>
-          </Section>
+            </>
+          ) : (
+            <div className="text-sm text-slate-500 italic">No dream college selected — student opted to see all rankings.</div>
+          )}
+        </div>
+      </Section>
 
-          {/* Subject-wise scores — visual */}
-          <Section title="Subject-wise NTA scores">
-            <div className="space-y-2">
-              {subjItems.map(it => {
-                const pct = Math.min(100, (it.score / 250) * 100);
-                const tone = pct >= 90 ? 'safe' : pct >= 80 ? 'good' : pct >= 65 ? 'mid' : 'risk';
-                return (
-                  <div key={it.code} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                    <div className="flex items-baseline justify-between mb-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-mono text-[10px] text-slate-400 tabular-nums">{it.code}</span>
-                        <span className="text-sm font-semibold text-slate-900">{it.name}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">{it.group}</span>
-                      </div>
-                      <div className="font-mono tabular-nums text-slate-900 font-bold">{it.score?.toFixed(2) ?? '—'} <span className="text-slate-300 text-xs">/ 250</span></div>
-                    </div>
-                    <div className={`bar bar-${tone}`}>
-                      <div style={{ width: `${pct}%` }} />
-                    </div>
+      <Section title="Subject-wise NTA scores">
+        <div className="space-y-2">
+          {subjItems.map(it => {
+            const pct = Math.min(100, (it.score / 250) * 100);
+            const tone = pct >= 90 ? 'safe' : pct >= 80 ? 'good' : pct >= 65 ? 'mid' : 'risk';
+            return (
+              <div key={it.code} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                <div className="flex items-baseline justify-between mb-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-[10px] text-slate-400 tabular-nums">{it.code}</span>
+                    <span className="text-sm font-semibold text-slate-900">{it.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400">{it.group}</span>
                   </div>
-                );
-              })}
-            </div>
-          </Section>
-
-          {/* Footer with delete inside detail modal */}
-          <div className="mt-6 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[11px] text-slate-400 font-mono">id: {entry.id}</div>
-            <details className="text-[11px]">
-              <summary className="cursor-pointer text-slate-500 hover:text-slate-700">Show raw JSON</summary>
-              <pre className="mt-2 p-3 rounded-lg bg-slate-900 text-slate-100 text-[10px] overflow-x-auto max-h-72">{JSON.stringify(entry, null, 2)}</pre>
-            </details>
-          </div>
+                  <div className="font-mono tabular-nums text-slate-900 font-bold">{it.score?.toFixed(2) ?? '—'} <span className="text-slate-300 text-xs">/ 250</span></div>
+                </div>
+                <div className={`bar bar-${tone}`}>
+                  <div style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
         </div>
+      </Section>
+
+      <div className="mt-6 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[11px] text-slate-400 font-mono">id: {entry.id}</div>
+        <details className="text-[11px]">
+          <summary className="cursor-pointer text-slate-500 hover:text-slate-700">Show raw JSON</summary>
+          <pre className="mt-2 p-3 rounded-lg bg-slate-900 text-slate-100 text-[10px] overflow-x-auto max-h-72">{JSON.stringify(entry, null, 2)}</pre>
+        </details>
       </div>
     </div>
   );
 }
 
 /* ===================================================================
-   CONFIRMATION MODAL
+   CONFIRM MODAL BODY
    =================================================================== */
-function ConfirmModal({ kind, name, count, onCancel, onConfirm, busy }) {
+function ConfirmModalBody({ kind, name, count, onCancel, onConfirm, busy }) {
   return (
-    <div className="modal-backdrop !z-[110]" onClick={busy ? undefined : onCancel}>
-      <div className="card-solid max-w-md w-full p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="h-12 w-12 rounded-full bg-rose-100 grid place-items-center text-2xl mx-auto mb-3">⚠️</div>
-        <h3 className="font-display text-2xl text-slate-900 text-center">
-          {kind === 'all' ? 'Delete ALL entries?' : 'Delete this entry?'}
-        </h3>
-        <p className="mt-2 text-sm text-slate-600 text-center">
-          {kind === 'all'
-            ? <>This will permanently delete all <b>{count}</b> submissions from Supabase. This cannot be undone.</>
-            : <>This will permanently delete <b>{name || 'this entry'}</b> from Supabase. This cannot be undone.</>}
-        </p>
-        <div className="mt-5 flex gap-2">
-          <button onClick={onCancel} disabled={busy} className="btn-ghost flex-1 py-2.5">Cancel</button>
-          <button onClick={onConfirm} disabled={busy}
-            className="flex-1 py-2.5 rounded-xl font-semibold bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50">
-            {busy ? 'Deleting…' : (kind === 'all' ? 'Yes, delete all' : 'Yes, delete')}
-          </button>
-        </div>
+    <div className="p-6">
+      <div className="h-12 w-12 rounded-full bg-rose-100 grid place-items-center text-2xl mx-auto mb-3">⚠️</div>
+      <h3 className="font-display text-2xl text-slate-900 text-center">
+        {kind === 'all' ? 'Delete ALL entries?' : 'Delete this entry?'}
+      </h3>
+      <p className="mt-2 text-sm text-slate-600 text-center">
+        {kind === 'all'
+          ? <>This will permanently delete all <b>{count}</b> submissions from Supabase. This cannot be undone.</>
+          : <>This will permanently delete <b>{name || 'this entry'}</b> from Supabase. This cannot be undone.</>}
+      </p>
+      <div className="mt-5 flex gap-2">
+        <button onClick={onCancel} disabled={busy} className="btn-ghost flex-1 py-2.5">Cancel</button>
+        <button onClick={onConfirm} disabled={busy}
+          className="flex-1 py-2.5 rounded-xl font-semibold bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50">
+          {busy ? 'Deleting…' : (kind === 'all' ? 'Yes, delete all' : 'Yes, delete')}
+        </button>
       </div>
     </div>
   );
 }
 
 /* ===================================================================
-   SHARED
+   SHARED COMPONENTS
    =================================================================== */
 function KPI({ label, value, small, accent }) {
   const ring = { indigo: 'from-indigo-500 to-violet-600', emerald: 'from-emerald-500 to-teal-600', amber: 'from-amber-500 to-orange-600', rose: 'from-rose-500 to-pink-600' }[accent];

@@ -51,19 +51,34 @@ create table if not exists public.outcomes (
 alter table public.submissions enable row level security;
 alter table public.outcomes    enable row level security;
 
--- Submissions: anon/public can insert, no one else can read/update/delete via RLS
+-- Submissions: anon/public can insert
 drop policy if exists "public can insert submissions" on public.submissions;
 create policy "public can insert submissions" on public.submissions
   for insert
   to anon, authenticated
   with check (true);
 
--- Outcomes: same
+-- Submissions: anon can DELETE — admin endpoints control access at the API layer
+-- via the password gate, so allowing it at the DB level is safe and enables the
+-- admin delete button to work even if SUPABASE_SERVICE_ROLE_KEY isn't configured.
+drop policy if exists "public can delete submissions" on public.submissions;
+create policy "public can delete submissions" on public.submissions
+  for delete
+  to anon, authenticated
+  using (true);
+
+-- Outcomes: same insert + delete policies
 drop policy if exists "public can insert outcomes" on public.outcomes;
 create policy "public can insert outcomes" on public.outcomes
   for insert
   to anon, authenticated
   with check (true);
+
+drop policy if exists "public can delete outcomes" on public.outcomes;
+create policy "public can delete outcomes" on public.outcomes
+  for delete
+  to anon, authenticated
+  using (true);
 
 -- ============================================================
 -- Sanity check: insert + delete a probe row so this script proves
