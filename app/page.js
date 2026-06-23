@@ -109,7 +109,7 @@ export default function Home() {
           <span className="italic">Let{' '}
             <span className="relative inline-block">
               data science
-              <svg className="absolute -bottom-2 left-0 w-full" height="14" viewBox="0 0 300 14" fill="none" preserveAspectRatio="none">
+              <svg className="absolute -bottom-1 sm:-bottom-2 left-0 w-full h-[5px] sm:h-[14px]" viewBox="0 0 300 14" fill="none" preserveAspectRatio="none">
                 <path d="M2 9c50-6 100-6 150 0s100 6 146 0" stroke="url(#g)" strokeWidth="3" strokeLinecap="round" />
                 <defs>
                   <linearGradient id="g" x1="0" y1="0" x2="300" y2="0">
@@ -120,11 +120,22 @@ export default function Home() {
             </span>{' '}calculate your real odds.
           </span>
         </h1>
-        <p className="mt-6 text-sm sm:text-lg text-slate-600 max-w-3xl mx-auto px-2">
+        <p className="mt-6 text-[13px] leading-[1.55] sm:text-lg sm:leading-normal text-slate-600 max-w-3xl mx-auto px-3">
           A 12-factor statistical engine that <b className="text-slate-900">projects 2026 cutoffs</b> and your real admission chances across <b className="text-slate-900">1,526 college-program combinations</b> at Delhi University.
         </p>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-slate-500">
-          <Stat>1,526 programs</Stat>·<Stat>67 colleges</Stat>·<Stat>12-factor engine</Stat>·<Stat>all categories</Stat>
+        <div className="mt-7 text-xs text-slate-500 leading-[1.9]">
+          {/* Mobile: forced 2-line split (2+2). Desktop: single line. */}
+          <div className="sm:hidden flex flex-col items-center gap-y-0.5">
+            <div className="flex items-center gap-x-2">
+              <Stat>1,526 programs</Stat>·<Stat>67 colleges</Stat>
+            </div>
+            <div className="flex items-center gap-x-2">
+              <Stat>12-factor engine</Stat>·<Stat>all categories</Stat>
+            </div>
+          </div>
+          <div className="hidden sm:flex flex-wrap items-center justify-center gap-x-2">
+            <Stat>1,526 programs</Stat>·<Stat>67 colleges</Stat>·<Stat>12-factor engine</Stat>·<Stat>all categories</Stat>
+          </div>
         </div>
       </section>
 

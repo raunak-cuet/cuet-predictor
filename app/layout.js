@@ -36,7 +36,8 @@ export default function RootLayout({ children }) {
                 <a href="/" className="flex items-center gap-3 group">
                   <div className="leading-tight">
                     <img src="/dreamseat-wordmark.png" alt="DreamSeat"
-                         className="h-9 sm:h-12 w-auto block" />
+                         className="h-7 sm:h-10 w-auto block shrink-0"
+                         style={{ maxWidth: 'none' }} />
                     <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1.5">
                       CUET 2026 College &amp; Cutoff Predictor
                     </div>
