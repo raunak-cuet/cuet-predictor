@@ -264,8 +264,8 @@ function DetailModal({ entry, onClose }) {
   })).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-4 bg-slate-900/50" onClick={onClose}>
-      <div className="card-solid max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="card-solid max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="p-6 sm:p-7">
           {/* Header */}
           <div className="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-slate-200">
@@ -351,8 +351,8 @@ function DetailModal({ entry, onClose }) {
    =================================================================== */
 function ConfirmModal({ kind, name, count, onCancel, onConfirm, busy }) {
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60" onClick={busy ? undefined : onCancel}>
-      <div className="card-solid max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop !z-[110]" onClick={busy ? undefined : onCancel}>
+      <div className="card-solid max-w-md w-full p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="h-12 w-12 rounded-full bg-rose-100 grid place-items-center text-2xl mx-auto mb-3">⚠️</div>
         <h3 className="font-display text-2xl text-slate-900 text-center">
           {kind === 'all' ? 'Delete ALL entries?' : 'Delete this entry?'}
