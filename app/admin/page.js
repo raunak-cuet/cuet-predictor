@@ -9,15 +9,19 @@ export default function AdminPage() {
   const [auth, setAuth] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
   const [summary, setSummary] = useState(null);
   const [entries, setEntries] = useState([]);
+
   const [filterCat, setFilterCat] = useState('ALL');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('DATE');
-  const [selected, setSelected] = useState(null);
-  const [confirmDel, setConfirmDel] = useState(null);
+
+  const [selected, setSelected] = useState(null);     // entry shown in detail modal
+  const [confirmDel, setConfirmDel] = useState(null); // {kind:'one'|'all', id?, name?}
   const [deleting, setDeleting] = useState(false);
 
+  // -------- AUTH --------
   async function login(e) {
     e?.preventDefault();
     setErr('');
@@ -25,12 +29,18 @@ export default function AdminPage() {
     try {
       const r = await fetch(`/api/admin/entries?password=${encodeURIComponent(pwd)}`);
       const j = await r.json();
-      if (!r.ok) { setErr(j.error || 'Login failed'); setBusy(false); return; }
+      if (!r.ok) {
+        setErr(j.error || 'Login failed');
+        setBusy(false);
+        return;
+      }
       setSummary(j.summary);
       setEntries(j.entries || []);
       setAuth(true);
       sessionStorage.setItem('cuet:admin', pwd);
-    } catch { setErr('Network error'); }
+    } catch {
+      setErr('Network error');
+    }
     setBusy(false);
   }
 
@@ -38,69 +48,78 @@ export default function AdminPage() {
     try {
       const r = await fetch(`/api/admin/entries?password=${encodeURIComponent(pwd)}`);
       const j = await r.json();
-      if (r.ok) { setSummary(j.summary); setEntries(j.entries || []); }
+      if (r.ok) {
+        setSummary(j.summary);
+        setEntries(j.entries || []);
+      }
     } catch {}
   }
 
+  // -------- DELETE --------
   async function doDelete() {
     if (!confirmDel) return;
     setDeleting(true);
-    let response, json;
     try {
       const body = confirmDel.kind === 'all'
         ? { password: pwd, all: true }
-        : { password: pwd, ids: [confirmDel.id] };
+        : { password: pwd, id: confirmDel.id };
 
-      response = await fetch('/api/admin/delete', {
+      const r = await fetch('/api/admin/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      const j = await r.json();
 
-      // Parse JSON safely — even if response is empty
-      try { json = await response.json(); }
-      catch { json = { error: `Server returned ${response.status} with no JSON body` }; }
-
-      if (!response.ok) {
-        console.error('[delete] Server error:', response.status, json);
-        alert(`Delete failed (HTTP ${response.status}):\n${json.error || 'Unknown error'}`);
+      if (!r.ok) {
+        alert(`Delete failed:\n\n${j.error || 'Unknown'}\n${j.hint ? '\nHint: ' + j.hint : ''}`);
         setDeleting(false);
         return;
       }
 
-      // Optimistic UI update
-      if (confirmDel.kind === 'all') setEntries([]);
-      else setEntries(prev => prev.filter(e => e.id !== confirmDel.id));
-      if (selected?.id === confirmDel.id) setSelected(null);
+      // Success! Update UI based on the verified deletion count from the server
+      if (confirmDel.kind === 'all') {
+        if (j.deleted > 0) setEntries([]);
+        alert(`Deleted ${j.deleted} of ${j.beforeCount} entries.`);
+      } else {
+        setEntries(prev => prev.filter(e => e.id !== confirmDel.id));
+        if (selected?.id === confirmDel.id) setSelected(null);
+      }
+
       setConfirmDel(null);
       await refresh();
-    } catch (networkError) {
-      console.error('[delete] Network exception:', networkError);
-      alert(`Could not reach the server. Detail: ${networkError.message || networkError}`);
+    } catch (e) {
+      alert(`Network error: ${e.message || e}`);
     }
     setDeleting(false);
   }
 
+  // -------- SAVED PASSWORD AUTO-LOGIN --------
   useEffect(() => {
     const cached = sessionStorage.getItem('cuet:admin');
     if (cached) setPwd(cached);
   }, []);
 
+  // -------- TABLE VIEW --------
   const view = useMemo(() => {
     let arr = entries;
     if (filterCat !== 'ALL') arr = arr.filter(e => e.category === filterCat);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      arr = arr.filter(e => (e.name || '').toLowerCase().includes(q) || (e.dream_label || '').toLowerCase().includes(q));
+      arr = arr.filter(e =>
+        (e.name || '').toLowerCase().includes(q) ||
+        (e.dream_label || '').toLowerCase().includes(q)
+      );
     }
     arr = [...arr];
     if (sort === 'DATE')  arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    if (sort === 'NAME')  arr.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     if (sort === 'SCORE') arr.sort((a, b) => (b.composite_top ?? -1) - (a.composite_top ?? -1));
     if (sort === 'PROB')  arr.sort((a, b) => (b.dream_probability ?? -1) - (a.dream_probability ?? -1));
-    if (sort === 'NAME')  arr.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return arr;
   }, [entries, filterCat, search, sort]);
 
+  // -------- CSV EXPORT --------
   function downloadCSV() {
     const allCodes = Array.from(new Set(entries.flatMap(e => Object.keys(e.scores || {})))).sort();
     const baseHeaders = ['created_at', 'name', 'category', 'dream_label', 'composite_top', 'dream_probability'];
@@ -119,20 +138,27 @@ export default function AdminPage() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `cuet_du_submissions_${Date.now()}.csv`;
-    a.click(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = `dreamseat_entries_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
+  // -------- LOGIN SCREEN --------
   if (!auth) {
     return (
       <div className="max-w-md mx-auto mt-16 animate-in">
         <div className="card p-8">
           <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 grid place-items-center text-white text-xl mx-auto mb-4">🔐</div>
           <h1 className="font-display text-3xl text-center text-slate-900 mb-1">Owner Dashboard</h1>
-          <p className="text-sm text-slate-500 text-center mb-6">Enter the admin password to continue.</p>
+          <p className="text-sm text-slate-500 text-center mb-6">Enter the admin password.</p>
           <form onSubmit={login} className="space-y-3">
-            <input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)}
-              placeholder="••••••••••••" className="field" autoFocus />
+            <input
+              type="password" value={pwd}
+              onChange={(e) => setPwd(e.target.value)}
+              placeholder="••••••••••••"
+              className="field" autoFocus
+            />
             {err && <div className="text-sm text-rose-600 px-1">{err}</div>}
             <button disabled={busy} className="btn-primary w-full py-3">
               {busy ? 'Verifying…' : 'Unlock'}
@@ -143,6 +169,7 @@ export default function AdminPage() {
     );
   }
 
+  // -------- DASHBOARD --------
   return (
     <div className="space-y-6 animate-in">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -153,11 +180,13 @@ export default function AdminPage() {
         <button
           onClick={() => setConfirmDel({ kind: 'all' })}
           disabled={entries.length === 0}
-          className="px-3 py-2 rounded-lg text-sm font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed">
+          className="px-3 py-2 rounded-lg text-sm font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           🗑 Delete all entries
         </button>
       </div>
 
+      {/* KPI tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KPI label="Total submissions" value={summary?.total ?? 0} accent="indigo" />
         <KPI label="Today" value={summary?.today ?? 0} accent="emerald" />
@@ -165,11 +194,14 @@ export default function AdminPage() {
         <KPI label="Top dream pick" value={summary?.popular || '—'} small accent="rose" />
       </div>
 
+      {/* Filters + table */}
       <div className="card p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name / dream college…"
-            className="field !py-2 text-sm flex-1 min-w-[200px]" />
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name / dream…"
+            className="field !py-2 text-sm flex-1 min-w-[200px]"
+          />
           <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="field !py-2 text-sm">
             <option value="ALL">All categories</option>
             <option value="UR">UR</option><option value="OBC">OBC</option><option value="SC">SC</option>
@@ -179,7 +211,7 @@ export default function AdminPage() {
             <option value="DATE">Sort: Date</option>
             <option value="NAME">Sort: Name</option>
             <option value="SCORE">Sort: Composite</option>
-            <option value="PROB">Sort: Dream Prob.</option>
+            <option value="PROB">Sort: Dream %</option>
           </select>
           <button onClick={downloadCSV} className="btn-primary !rounded-xl text-sm px-4 py-2">
             ⬇️ Export CSV ({view.length})
@@ -213,9 +245,7 @@ export default function AdminPage() {
                   <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
                     {e.name || <span className="italic text-slate-400 font-normal">anonymous</span>}
                   </td>
-                  <td className="py-2.5 px-3">
-                    <span className="badge badge-good">{e.category}</span>
-                  </td>
+                  <td className="py-2.5 px-3"><span className="badge badge-good">{e.category}</span></td>
                   <td className="py-2.5 px-3 text-slate-700 max-w-md truncate" title={e.dream_label}>
                     {e.dream_label || <span className="italic text-slate-400">—</span>}
                   </td>
@@ -229,9 +259,8 @@ export default function AdminPage() {
                     <button
                       onClick={() => setConfirmDel({ kind: 'one', id: e.id, name: e.name })}
                       title="Delete this entry"
-                      className="h-7 w-7 grid place-items-center rounded-md text-rose-500 hover:bg-rose-50 hover:text-rose-700">
-                      🗑
-                    </button>
+                      className="h-7 w-7 grid place-items-center rounded-md text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                    >🗑</button>
                   </td>
                 </tr>
               ))}
@@ -242,7 +271,7 @@ export default function AdminPage() {
         <p className="mt-3 text-[11px] text-slate-400">Click any row for an in-depth analysis of that student.</p>
       </div>
 
-      {/* PORTAL the modals to <body> so they escape the navbar's stacking context */}
+      {/* Modals via Portal */}
       {selected && (
         <PortalModal onClose={() => setSelected(null)}>
           <DetailModalBody entry={selected} onClose={() => setSelected(null)} />
@@ -265,40 +294,37 @@ export default function AdminPage() {
   );
 }
 
-/* ===================================================================
-   PORTAL MODAL WRAPPER — rendered into <body>, covers entire viewport
-   =================================================================== */
+/* ============================================================
+   PORTAL MODAL — full-viewport backdrop
+   ============================================================ */
 function PortalModal({ children, onClose, maxWidthClass = 'max-w-3xl' }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
-    // Lock body scroll while modal is open
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, []);
-
   if (!mounted) return null;
-
   return createPortal(
     <div className="modal-fullscreen" onClick={onClose || undefined}>
       <div
         className={`card-solid w-full ${maxWidthClass} max-h-[90vh] overflow-y-auto shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </div>
+      >{children}</div>
     </div>,
     document.body
   );
 }
 
-/* ===================================================================
-   DETAIL MODAL BODY — the actual content shown for a student
-   =================================================================== */
+/* ============================================================
+   DETAIL MODAL
+   ============================================================ */
 function DetailModalBody({ entry, onClose }) {
   const scores = entry.scores || {};
-  const codes = (entry.subjects_taken && entry.subjects_taken.length) ? entry.subjects_taken : Object.keys(scores);
+  const codes = (entry.subjects_taken && entry.subjects_taken.length)
+    ? entry.subjects_taken
+    : Object.keys(scores);
   const subjItems = codes.map(c => ({
     code: c,
     name: SUBJECT_BY_CODE[c]?.name || c,
@@ -358,7 +384,9 @@ function DetailModalBody({ entry, onClose }) {
                     <span className="text-sm font-semibold text-slate-900">{it.name}</span>
                     <span className="text-[10px] uppercase tracking-wider text-slate-400">{it.group}</span>
                   </div>
-                  <div className="font-mono tabular-nums text-slate-900 font-bold">{it.score?.toFixed(2) ?? '—'} <span className="text-slate-300 text-xs">/ 250</span></div>
+                  <div className="font-mono tabular-nums text-slate-900 font-bold">
+                    {it.score?.toFixed(2) ?? '—'} <span className="text-slate-300 text-xs">/ 250</span>
+                  </div>
                 </div>
                 <div className={`bar bar-${tone}`}>
                   <div style={{ width: `${pct}%` }} />
@@ -380,9 +408,9 @@ function DetailModalBody({ entry, onClose }) {
   );
 }
 
-/* ===================================================================
-   CONFIRM MODAL BODY
-   =================================================================== */
+/* ============================================================
+   CONFIRM MODAL
+   ============================================================ */
 function ConfirmModalBody({ kind, name, count, onCancel, onConfirm, busy }) {
   return (
     <div className="p-6">
@@ -406,11 +434,16 @@ function ConfirmModalBody({ kind, name, count, onCancel, onConfirm, busy }) {
   );
 }
 
-/* ===================================================================
+/* ============================================================
    SHARED COMPONENTS
-   =================================================================== */
+   ============================================================ */
 function KPI({ label, value, small, accent }) {
-  const ring = { indigo: 'from-indigo-500 to-violet-600', emerald: 'from-emerald-500 to-teal-600', amber: 'from-amber-500 to-orange-600', rose: 'from-rose-500 to-pink-600' }[accent];
+  const ring = {
+    indigo: 'from-indigo-500 to-violet-600',
+    emerald: 'from-emerald-500 to-teal-600',
+    amber: 'from-amber-500 to-orange-600',
+    rose: 'from-rose-500 to-pink-600'
+  }[accent];
   return (
     <div className="card p-4 relative overflow-hidden">
       <div className={`absolute -top-6 -right-6 h-20 w-20 rounded-full bg-gradient-to-br ${ring} opacity-15`} />
