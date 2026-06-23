@@ -40,12 +40,12 @@ export default function ResultsPage() {
         </section>
       )}
 
+      <ImportantDisclaimer />
+
       <section>
         <SectionDivider label="All eligible programs" color="indigo" />
         <AllResults results={results} dreamId={dream?.id} />
       </section>
-
-      <ImportantDisclaimer />
 
       <DisclaimerCard />
     </div>

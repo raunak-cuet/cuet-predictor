@@ -376,55 +376,57 @@ function Mi({ n, children }) {
 }
 
 /* =====================================================================
-   CutoffTicker — A "stock-ticker" of EXPECTED 2026 cutoffs for the
-   most-searched DU programs. Pulled live from the projection engine
-   using the actual 2025 cutoffs in the dataset.
+   CutoffTicker — Grandeur showcase. Announces that the platform covers
+   every flagship DU program WITHOUT revealing numeric cutoffs (so
+   students don't self-disqualify before entering their scores).
    ===================================================================== */
 function CutoffTicker() {
-  // Hardcoded marquee items — projections computed once on mount from the engine.
-  const items = useMemo(() => {
-    // Fetch a few "famous" programs by id (these IDs come from the prebuilt programs.data.json).
-    // We don't run the full engine here — instead we surface the headline projected cutoff
-    // we already computed elsewhere, ranged per category UR. Numbers below are the
-    // engine outputs (verified against the predictor) — kept inline for instant render
-    // (no async data fetch on the landing page).
-    return [
-      { college: 'SRCC',                         program: 'B.Com (Hons.)',      cutoff: '929',  cat: 'UR', tier: 'top-elite' },
-      { college: 'SRCC',                         program: 'B.A. (Hons.) Economics', cutoff: '884', cat: 'UR', tier: 'top-elite' },
-      { college: 'Hindu College',                program: 'B.A. (Hons.) Economics', cutoff: '910', cat: 'UR', tier: 'top-elite' },
-      { college: 'Hindu College',                program: 'B.Com (Hons.)',       cutoff: '935', cat: 'UR', tier: 'top-elite' },
-      { college: 'SSCBS',                         program: 'BBA (FIA)',           cutoff: '791', cat: 'UR', tier: 'elite' },
-      { college: 'SSCBS',                         program: 'BMS',                 cutoff: '760', cat: 'UR', tier: 'elite' },
-      { college: 'Stephen\'s',                    program: 'B.A. Economics',      cutoff: '703', cat: 'UR', tier: 'general' },
-      { college: 'Lady Shri Ram College',         program: 'B.A. (Hons.) Economics', cutoff: '895', cat: 'UR', tier: 'top-elite' },
-      { college: 'Miranda House',                 program: 'B.Sc (Hons.) Physics', cutoff: '720', cat: 'UR', tier: 'general' },
-      { college: 'Hansraj College',               program: 'B.Com (Hons.)',       cutoff: '912', cat: 'UR', tier: 'top-elite' },
-      { college: 'Kirori Mal College',            program: 'B.Com (Hons.)',       cutoff: '895', cat: 'UR', tier: 'top-elite' },
-      { college: 'Venkateswara',                  program: 'B.Com (Hons.)',       cutoff: '909', cat: 'UR', tier: 'top-elite' },
-    ];
-  }, []);
+  const items = useMemo(() => ([
+    { college: 'Shri Ram College of Commerce',                   program: 'B.Com (Hons.)' },
+    { college: 'Shri Ram College of Commerce',                   program: 'B.A. (Hons.) Economics' },
+    { college: 'Hindu College',                                  program: 'B.A. (Hons.) Economics' },
+    { college: 'Hindu College',                                  program: 'B.Com (Hons.)' },
+    { college: 'St. Stephen\'s College',                         program: 'B.A. Economics' },
+    { college: 'Shaheed Sukhdev College of Business Studies',    program: 'BBA (Financial Investment Analysis)' },
+    { college: 'Shaheed Sukhdev College of Business Studies',    program: 'Bachelor of Management Studies' },
+    { college: 'Lady Shri Ram College for Women',                program: 'B.A. (Hons.) Economics' },
+    { college: 'Hansraj College',                                program: 'B.Com (Hons.)' },
+    { college: 'Miranda House',                                  program: 'B.Sc (Hons.) Physics' },
+    { college: 'Kirori Mal College',                             program: 'B.Com (Hons.)' },
+    { college: 'Sri Venkateswara College',                       program: 'B.Com (Hons.)' },
+    { college: 'Atma Ram Sanatan Dharma College',                program: 'B.A. (Hons.) Economics' },
+    { college: 'Daulat Ram College',                             program: 'B.Sc (Hons.) Chemistry' },
+    { college: 'Ramjas College',                                 program: 'B.A. (Hons.) English' },
+    { college: 'Gargi College',                                  program: 'B.A. (Hons.) Political Science' },
+  ]), []);
 
   return (
     <div className="ticker-wrap">
-      <div className="ticker-label">
-        <span className="ticker-dot" />
-        <span>EXPECTED&nbsp;2026&nbsp;CUTOFFS</span>
+      <div className="ticker-headline">
+        <div className="ticker-badge">
+          <span className="ticker-dot" />
+          <span>NEW · CUET 2026</span>
+        </div>
+        <h2 className="ticker-title">
+          We project the <span className="ticker-grad">Expected 2026 Cutoffs</span><br />
+          for every Delhi University program.
+        </h2>
+        <p className="ticker-sub">
+          1,526 college-program combinations · all categories · enter your scores below to see yours.
+        </p>
       </div>
+
       <div className="ticker-viewport">
         <div className="ticker-track">
           {[...items, ...items].map((it, i) => (
-            <div key={i} className={`ticker-item ticker-${it.tier}`}>
+            <div key={i} className="ticker-item">
+              <span className="ticker-star">✦</span>
               <span className="ticker-college">{it.college}</span>
-              <span className="ticker-sep">·</span>
+              <span className="ticker-sep">—</span>
               <span className="ticker-program">{it.program}</span>
-              <span className="ticker-cutoff">~{it.cutoff}<span className="ticker-cutoff-sub">/1000</span></span>
-              <span className="ticker-cat">{it.cat}</span>
             </div>
           ))}
         </div>
-      </div>
-      <div className="ticker-hint">
-        Live projections from the model · enter your scores below to see your full ranked list across 1,526 programs
       </div>
     </div>
   );

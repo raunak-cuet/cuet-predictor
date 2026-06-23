@@ -204,46 +204,59 @@ body {
 }
 
 /* ============================================================
-   EXPECTED 2026 CUTOFFS — Live ticker (stock-ticker style)
+   EXPECTED 2026 CUTOFFS — Grand showcase (NO numeric cutoffs)
    ============================================================ */
 .ticker-wrap {
   position: relative;
   margin-top: 0.5rem;
-  background: linear-gradient(135deg, #0b1020 0%, #1c2742 60%, #312e81 100%);
+  background:
+    radial-gradient(900px 400px at 0% 0%, rgba(168, 85, 247, 0.18), transparent 55%),
+    radial-gradient(700px 350px at 100% 100%, rgba(6, 182, 212, 0.15), transparent 55%),
+    linear-gradient(135deg, #0b1020 0%, #1c1933 60%, #1e1b4b 100%);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 22px;
-  padding: 1rem 1rem 0.85rem;
+  border-radius: 26px;
+  padding: 2rem 0 1.4rem;
   overflow: hidden;
   box-shadow:
     0 1px 0 rgba(255,255,255,0.06) inset,
-    0 18px 40px -16px rgba(11, 16, 32, 0.35);
+    0 24px 60px -20px rgba(11, 16, 32, 0.45);
 }
+
+/* Premium gradient border */
 .ticker-wrap::before {
   content: '';
   position: absolute;
   inset: -1px;
-  border-radius: 22px;
+  border-radius: 26px;
   padding: 1px;
   background: linear-gradient(135deg, rgba(168,85,247,0.6), rgba(6,182,212,0.4), rgba(245,158,11,0.5));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
   pointer-events: none;
-  opacity: 0.6;
+  opacity: 0.5;
 }
-.ticker-label {
+
+/* Headline block */
+.ticker-headline {
+  text-align: center;
+  padding: 0 1.5rem 1.4rem;
+  position: relative;
+  z-index: 2;
+}
+.ticker-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   font-size: 0.625rem;
   font-weight: 800;
   letter-spacing: 0.18em;
   color: #fbbf24;
   background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  padding: 0.32rem 0.7rem;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.32rem 0.75rem;
   border-radius: 999px;
-  margin-bottom: 0.7rem;
+  margin-bottom: 1rem;
 }
 .ticker-dot {
   display: inline-block;
@@ -258,19 +271,43 @@ body {
   70%  { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0); }
   100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
 }
+.ticker-title {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: clamp(1.7rem, 3vw + 1rem, 2.8rem);
+  line-height: 1.15;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.6rem;
+}
+.ticker-grad {
+  background: linear-gradient(135deg, #fbbf24 0%, #f472b6 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-style: italic;
+}
+.ticker-sub {
+  font-size: 0.875rem;
+  color: #cbd5e1;
+  max-width: 540px;
+  margin: 0 auto;
+  line-height: 1.55;
+}
 
+/* Marquee viewport */
 .ticker-viewport {
   position: relative;
   overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
 }
 .ticker-track {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   width: max-content;
-  animation: ticker-scroll 60s linear infinite;
+  animation: ticker-scroll 70s linear infinite;
   will-change: transform;
+  padding: 0 1rem;
 }
 .ticker-wrap:hover .ticker-track { animation-play-state: paused; }
 @keyframes ticker-scroll {
@@ -281,57 +318,28 @@ body {
 .ticker-item {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.6rem 0.95rem;
-  background: rgba(255, 255, 255, 0.05);
+  gap: 0.6rem;
+  padding: 0.7rem 1.1rem;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  font-size: 0.8125rem;
-  color: #cbd5e1;
+  border-radius: 14px;
+  font-size: 0.875rem;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
 }
-.ticker-item:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
-
+.ticker-item:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.18);
+  transform: translateY(-1px);
+}
+.ticker-star {
+  color: #fbbf24;
+  font-size: 0.7rem;
+}
 .ticker-college  { font-weight: 700; color: #ffffff; }
-.ticker-program  { color: #93c5fd; }
 .ticker-sep      { color: #475569; }
-.ticker-cutoff   {
-  font-family: 'Inter', monospace;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: #34d399;
-  font-size: 0.95rem;
-  margin-left: 0.35rem;
-  padding: 0.15rem 0.5rem;
-  background: rgba(16, 185, 129, 0.10);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  border-radius: 6px;
-}
-.ticker-cutoff-sub { color: #6ee7b7; font-size: 0.65rem; font-weight: 500; margin-left: 1px; }
-.ticker-cat {
-  font-size: 0.625rem;
-  font-weight: 700;
-  color: #94a3b8;
-  background: rgba(255,255,255,0.06);
-  padding: 0.18rem 0.45rem;
-  border-radius: 6px;
-  letter-spacing: 0.05em;
-}
-
-.ticker-top-elite .ticker-cutoff { color: #fde047; background: rgba(250, 204, 21, 0.10); border-color: rgba(250, 204, 21, 0.25); }
-.ticker-top-elite .ticker-cutoff-sub { color: #fef08a; }
-.ticker-elite     .ticker-cutoff { color: #c4b5fd; background: rgba(167, 139, 250, 0.10); border-color: rgba(167, 139, 250, 0.25); }
-.ticker-elite     .ticker-cutoff-sub { color: #ddd6fe; }
-
-.ticker-hint {
-  margin-top: 0.7rem;
-  text-align: center;
-  font-size: 0.65rem;
-  color: #94a3b8;
-  letter-spacing: 0.02em;
-}
+.ticker-program  { color: #a5b4fc; font-weight: 500; }
 
 @media (prefers-reduced-motion: reduce) {
   .ticker-track { animation: none; }
