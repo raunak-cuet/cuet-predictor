@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { LANGUAGES, DOMAINS, GAT, SUBJECT_BY_CODE } from '@/lib/subjects';
 import { eligibleProgramsForSubjects } from '@/lib/engine';
@@ -27,7 +28,6 @@ export default function Home() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const dropdownRef = useRef(null);
 
   const dreamOptions = useMemo(() => eligibleProgramsForSubjects(subjectsTaken), [subjectsTaken]);
   const filteredDreams = useMemo(() => {
@@ -40,11 +40,9 @@ export default function Home() {
     });
   }, [searchDream, dreamOptions]);
 
-  useEffect(() => {
-    function onClick(e) { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowDropdown(false); }
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
+  // Hard-cap rendered DOM nodes to 80 for smooth 60fps. The user can
+  // always type more characters to narrow the visible list further.
+  const displayedDreams = useMemo(() => filteredDreams.slice(0, 80), [filteredDreams]);
 
   const toggleSubject = (code) => {
     setSubjectsTaken(prev => {
@@ -102,12 +100,12 @@ export default function Home() {
       <section className="text-center pt-4 pb-2">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-medium text-slate-700">NTA CUET 2026 scorecards released · model updated</span>
+          <span className="text-xs font-medium text-slate-700">CUET 2026 scorecards released · projecting 2026 cutoffs in real time</span>
         </div>
         <h1 className="mt-6 font-display text-5xl sm:text-7xl text-slate-900 leading-[0.95]">
-          Your real chances at <br className="hidden sm:block" />
+          Stop guessing your DU rank.<br className="hidden sm:block" />
           <span className="italic relative inline-block">
-            Delhi University
+            Let data science
             <svg className="absolute -bottom-2 left-0 w-full" height="14" viewBox="0 0 300 14" fill="none">
               <path d="M2 9c50-6 100-6 150 0s100 6 146 0" stroke="url(#g)" strokeWidth="3" strokeLinecap="round" />
               <defs>
@@ -116,15 +114,15 @@ export default function Home() {
                 </linearGradient>
               </defs>
             </svg>
-          </span>
-          , instantly.
+          </span>{' '}
+          calculate your real odds.
         </h1>
         <p className="mt-6 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
-          A statistically rigorous, fully explainable admission probability engine across&nbsp;
-          <b className="text-slate-900">1,526 college-program combinations</b>. No marketing fluff. No random percentages.
+          A 12-factor statistical engine that projects 2026 cutoffs and your real admission chances across&nbsp;
+          <b className="text-slate-900">1,526 college-program combinations</b> at Delhi University.
         </p>
         <div className="mt-7 flex items-center justify-center gap-2 text-xs text-slate-500">
-          <Stat>1,526 programs</Stat>·<Stat>67 colleges</Stat>·<Stat>12-factor engine</Stat>·<Stat>Live since 2026</Stat>
+          <Stat>1,526 programs</Stat>·<Stat>67 colleges</Stat>·<Stat>12-factor engine</Stat>
         </div>
       </section>
 
@@ -136,13 +134,13 @@ export default function Home() {
 
           {/* STEP 1 */}
           <Step n={1} title="Subjects you appeared for" subtitle="Pick only what you actually took. Courses will auto-filter.">
-            <div className="space-y-4">
+            <div className="space-y-7">
               <SubjectGroup title="Languages" list={LANGUAGES} selected={subjectsTaken} toggle={toggleSubject} accent="amber" />
               <SubjectGroup title="Domain Subjects" list={DOMAINS} selected={subjectsTaken} toggle={toggleSubject} accent="emerald" />
               <SubjectGroup title="General Aptitude" list={GAT} selected={subjectsTaken} toggle={toggleSubject} accent="indigo" />
             </div>
             {subjectsTaken.length > 0 && (
-              <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+              <div className="mt-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
                 ✓ {subjectsTaken.length} subject{subjectsTaken.length === 1 ? '' : 's'} selected
               </div>
             )}
@@ -211,49 +209,20 @@ export default function Home() {
 
           {/* STEP 5 — searchable dropdown with FULL college names */}
           <Step n={5} title="Dream college + course (optional)" subtitle="Type to search OR scroll the full list. Both work.">
-            <div ref={dropdownRef} className="relative">
-              <div className="relative">
-                <input type="text" value={searchDream}
-                  onFocus={() => setShowDropdown(true)}
-                  onChange={(e) => { setSearchDream(e.target.value); setShowDropdown(true); if (!e.target.value) clearDream(); }}
-                  placeholder={subjectsTaken.length === 0
-                    ? "Pick subjects in Step 1 first…"
-                    : "Search e.g. Shaheed Sukhdev, Shri Ram College of Commerce, Hindu College, Hansraj…"}
-                  disabled={subjectsTaken.length === 0}
-                  className="field pr-10 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed" />
-                {searchDream && (
-                  <button type="button" onClick={clearDream}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 grid place-items-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs">×</button>
-                )}
-              </div>
-
-              {showDropdown && subjectsTaken.length > 0 && (
-                <div className="dropdown-panel">
-                  {/* Search results header */}
-                  <div className="sticky top-0 px-4 py-2.5 bg-slate-100 border-b border-slate-200 text-[11px] text-slate-600 font-semibold uppercase tracking-wider">
-                    {searchDream
-                      ? `${filteredDreams.length.toLocaleString()} of ${dreamOptions.length.toLocaleString()} programs match`
-                      : `${dreamOptions.length.toLocaleString()} eligible programs · scroll or type to search`}
-                  </div>
-
-                  {filteredDreams.length === 0 ? (
-                    <div className="px-4 py-6 text-sm text-slate-500 text-center">
-                      No programs match "{searchDream}". Try fewer words or check spelling.
-                    </div>
-                  ) : (
-                    filteredDreams.map(o => (
-                      <button key={o.id} type="button" onClick={() => selectDream(o)}
-                        className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-100 last:border-0 transition
-                          ${String(o.id) === dreamId
-                            ? 'bg-indigo-50 text-indigo-900 font-medium'
-                            : 'text-slate-800 hover:bg-indigo-50/50'}`}>
-                        <div className="truncate">{o.label}</div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
+            <SearchableDream
+              dreamOptions={dreamOptions}
+              filteredDreams={filteredDreams}
+              displayedDreams={displayedDreams}
+              subjectsTaken={subjectsTaken}
+              searchDream={searchDream}
+              setSearchDream={setSearchDream}
+              showDropdown={showDropdown}
+              setShowDropdown={setShowDropdown}
+              dreamId={dreamId}
+              dreamLabel={dreamLabel}
+              selectDream={selectDream}
+              clearDream={clearDream}
+            />
             {dreamLabel && dreamId && (
               <div className="mt-3 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium">
                 ✓ Dream selected · <span className="font-normal">{dreamLabel}</span>
@@ -353,16 +322,20 @@ function Step({ n, title, subtitle, children }) {
 
 function SubjectGroup({ title, list, selected, toggle, accent }) {
   const accentClass = { amber: 'chip-on-amber', emerald: 'chip-on-emerald', indigo: 'chip-on-indigo', rose: 'chip-on-rose' }[accent];
+  const accentDot = { amber: 'bg-amber-500', emerald: 'bg-emerald-500', indigo: 'bg-indigo-500', rose: 'bg-rose-500' }[accent];
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 mb-1.5">{title}</div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`h-1.5 w-1.5 rounded-full ${accentDot}`} />
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">{title}</div>
+        <div className="flex-1 h-px bg-slate-100" />
+      </div>
+      <div className="flex flex-wrap gap-2.5">
         {list.map(s => {
           const on = selected.includes(s.code);
           return (
             <button key={s.code} type="button" onClick={() => toggle(s.code)}
               className={`chip ${on ? `chip-on ${accentClass}` : ''}`}>
-              <span className={`font-mono text-[10px] ${on ? 'opacity-80' : 'text-slate-400'}`}>{s.code}</span>
               <span>{s.name}</span>
             </button>
           );
@@ -392,5 +365,119 @@ function Mi({ n, children }) {
       <span className="shrink-0 h-5 w-5 rounded-full bg-cyan-100 text-cyan-700 grid place-items-center text-[10px] font-semibold">{n}</span>
       <span>{children}</span>
     </li>
+  );
+}
+
+/* =====================================================================
+   SearchableDream — Portal-based dropdown.
+   Renders the dropdown panel directly into <body>, bypassing every
+   CSS stacking context (cards, sticky nav, gradients). Position is
+   recomputed against the input on open / resize / scroll.
+   ===================================================================== */
+function SearchableDream({
+  dreamOptions, filteredDreams, displayedDreams, subjectsTaken,
+  searchDream, setSearchDream, showDropdown, setShowDropdown,
+  dreamId, dreamLabel, selectDream, clearDream
+}) {
+  const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0, openUp: false });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  // Recompute position whenever opened, or on scroll / resize while open
+  useLayoutEffect(() => {
+    if (!showDropdown || !inputRef.current) return;
+    function position() {
+      const rect = inputRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const panelH = 360; // matches max-height ~22rem
+      const openUp = spaceBelow < 220 && rect.top > panelH;
+      setCoords({
+        top:  openUp ? rect.top + window.scrollY - 8 : rect.bottom + window.scrollY + 6,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+        openUp
+      });
+    }
+    position();
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [showDropdown]);
+
+  // Click outside closes
+  useEffect(() => {
+    function onClick(e) {
+      if (!wrapperRef.current) return;
+      // wrapper contains the input; portal panel is outside, so check its own ref via class.
+      const insideInput = wrapperRef.current.contains(e.target);
+      const insidePanel = e.target.closest?.('.dropdown-portal');
+      if (!insideInput && !insidePanel) setShowDropdown(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [setShowDropdown]);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <input
+        ref={inputRef}
+        type="text" value={searchDream}
+        onFocus={() => setShowDropdown(true)}
+        onChange={(e) => { setSearchDream(e.target.value); setShowDropdown(true); if (!e.target.value) clearDream(); }}
+        placeholder={subjectsTaken.length === 0
+          ? "Pick subjects in Step 1 first…"
+          : "Search e.g. Shaheed Sukhdev, Shri Ram College of Commerce, Hindu College, Hansraj…"}
+        disabled={subjectsTaken.length === 0}
+        className="field pr-10 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+      />
+      {searchDream && (
+        <button type="button" onClick={clearDream}
+          className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 grid place-items-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs">×</button>
+      )}
+
+      {mounted && showDropdown && subjectsTaken.length > 0 && createPortal(
+        <div
+          className="dropdown-portal"
+          style={{
+            top: coords.openUp ? coords.top - 360 : coords.top,
+            left: coords.left,
+            width: coords.width
+          }}
+        >
+          <div className="sticky top-0 px-4 py-2.5 bg-slate-100 border-b border-slate-200 text-[11px] text-slate-600 font-semibold uppercase tracking-wider z-10">
+            {searchDream
+              ? `${filteredDreams.length.toLocaleString()} of ${dreamOptions.length.toLocaleString()} match · showing first ${Math.min(80, filteredDreams.length)}`
+              : `${dreamOptions.length.toLocaleString()} eligible · showing first 80 — type to narrow`}
+          </div>
+          {displayedDreams.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-slate-500 text-center">
+              No programs match "{searchDream}". Try fewer words or check spelling.
+            </div>
+          ) : (
+            displayedDreams.map(o => (
+              <button key={o.id} type="button" onClick={() => selectDream(o)}
+                className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-100 last:border-0
+                  ${String(o.id) === dreamId
+                    ? 'bg-indigo-50 text-indigo-900 font-medium'
+                    : 'text-slate-800 hover:bg-indigo-50/60'}`}>
+                <div className="truncate">{o.label}</div>
+              </button>
+            ))
+          )}
+          {filteredDreams.length > 80 && (
+            <div className="px-4 py-2.5 text-[11px] text-slate-500 bg-slate-50 border-t border-slate-200 text-center">
+              + {filteredDreams.length - 80} more programs hidden — type to narrow
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+    </div>
   );
 }

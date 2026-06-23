@@ -52,10 +52,8 @@ export default function RootLayout({ children }) {
                   <span className="text-slate-700 font-semibold">CUET → DU Predictor</span>
                   &nbsp;· Built on public NTA CUET 2025/2026 data &amp; DU 2025-26 Round-1 cutoffs.
                 </div>
-                <div className="flex gap-3 text-slate-400">
-                  <span>v2.0</span>
-                  <span>·</span>
-                  <span>Statistical projections — not guarantees.</span>
+                <div className="text-slate-400">
+                  Statistical projections — not guarantees.
                 </div>
               </div>
             </div>
