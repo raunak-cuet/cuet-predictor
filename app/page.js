@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LANGUAGES, DOMAINS, GAT, SUBJECT_BY_CODE } from '@/lib/subjects';
 import { eligibleProgramsForSubjects } from '@/lib/engine';
@@ -17,28 +17,55 @@ const CATEGORIES = [
 export default function Home() {
   const router = useRouter();
 
-  const [subjectsTaken, setSubjectsTaken] = useState(['101','319','309','305','501']);
+  // NOTHING preselected anymore — student picks everything fresh.
+  const [subjectsTaken, setSubjectsTaken] = useState([]);
   const [scores, setScores] = useState({});
   const [category, setCategory] = useState('UR');
   const [name, setName] = useState('');
   const [dreamId, setDreamId] = useState('');
+  const [dreamLabel, setDreamLabel] = useState('');
   const [searchDream, setSearchDream] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const dropdownRef = useRef(null);
 
   // Compute eligible dream-college options based on subjects taken
   const dreamOptions = useMemo(() => eligibleProgramsForSubjects(subjectsTaken), [subjectsTaken]);
 
+  // PROPER search: filters across ALL eligible programs (no 200-cap until display).
   const filteredDreams = useMemo(() => {
     const q = searchDream.trim().toLowerCase();
-    if (!q) return dreamOptions.slice(0, 200);
-    return dreamOptions.filter(d => d.label.toLowerCase().includes(q)).slice(0, 200);
+    let arr = dreamOptions;
+    if (q) {
+      // Token-based match — every word in the query must appear
+      const tokens = q.split(/\s+/).filter(Boolean);
+      arr = arr.filter(d => {
+        const hay = d.label.toLowerCase();
+        return tokens.every(t => hay.includes(t));
+      });
+    }
+    return arr.slice(0, 150);   // cap *displayed* list, not search corpus
   }, [searchDream, dreamOptions]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
   const toggleSubject = (code) => {
-    setSubjectsTaken(prev =>
-      prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
-    );
+    setSubjectsTaken(prev => {
+      const next = prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code];
+      // Reset dream pick if the selection invalidates it
+      setDreamId(''); setDreamLabel(''); setSearchDream('');
+      return next;
+    });
   };
 
   const onScore = (code, val) => {
@@ -51,37 +78,52 @@ export default function Home() {
     setScores({ ...scores, [code]: n });
   };
 
-  const canSubmit = subjectsTaken.length >= 1 &&
-    subjectsTaken.every(c => typeof scores[c] === 'number');
+  const selectDream = (opt) => {
+    setDreamId(String(opt.id));
+    setDreamLabel(opt.label);
+    setSearchDream(opt.label);
+    setShowDropdown(false);
+  };
+
+  const clearDream = () => {
+    setDreamId(''); setDreamLabel(''); setSearchDream('');
+  };
+
+  // NAME IS NOW REQUIRED
+  const canSubmit = name.trim().length >= 2 &&
+                    subjectsTaken.length >= 1 &&
+                    subjectsTaken.every(c => typeof scores[c] === 'number');
 
   async function submit() {
     setErr('');
-    if (!canSubmit) { setErr('Please enter a valid 0–250 score for every subject you appeared in.'); return; }
+    if (name.trim().length < 2) { setErr('Please enter your full name to continue.'); return; }
+    if (subjectsTaken.length < 1) { setErr('Please select at least one subject you appeared for.'); return; }
+    if (!subjectsTaken.every(c => typeof scores[c] === 'number')) {
+      setErr('Please enter a valid 0–250 score for every selected subject.'); return;
+    }
     setBusy(true);
     try {
-      const dream = dreamOptions.find(d => String(d.id) === String(dreamId));
       const res = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name, category, scores, subjectsTaken,
-          dreamProgramId: dream ? dream.id : null,
-          dreamLabel: dream ? dream.label : null
+          name: name.trim(), category, scores, subjectsTaken,
+          dreamProgramId: dreamId ? Number(dreamId) : null,
+          dreamLabel: dreamLabel || null
         })
       });
       const json = await res.json();
       if (!res.ok) { setErr(json.error || 'Server error'); setBusy(false); return; }
 
-      // Stash in sessionStorage for the results page
       sessionStorage.setItem('cuet:results', JSON.stringify({
-        payload: { name, category, scores, subjectsTaken,
-                   dreamProgramId: dream ? dream.id : null,
-                   dreamLabel: dream ? dream.label : null },
+        payload: { name: name.trim(), category, scores, subjectsTaken,
+                   dreamProgramId: dreamId ? Number(dreamId) : null,
+                   dreamLabel: dreamLabel || null },
         response: json
       }));
       router.push('/results');
     } catch (e) {
-      setErr('Network error. Please try again.');
+      setErr('Network error. Please check your internet and try again.');
       setBusy(false);
     }
   }
@@ -105,16 +147,23 @@ export default function Home() {
 
           {/* STEP 1 ============================= */}
           <Step n={1} title="Which subjects did you appear for?">
-            <p className="text-sm text-slate-500 mb-3">Only check the subjects you actually took. Eligible courses adapt automatically.</p>
+            <p className="text-sm text-slate-500 mb-3">Pick only the subjects you actually took. Eligible courses adapt automatically.</p>
             <SubjectsGrid groupTitle="Languages (List A)"  list={LANGUAGES} selected={subjectsTaken} toggle={toggleSubject} accent="from-amber-400 to-pink-500" />
             <SubjectsGrid groupTitle="Domain Subjects (List B)" list={DOMAINS} selected={subjectsTaken} toggle={toggleSubject} accent="from-emerald-400 to-cyan-500" />
             <SubjectsGrid groupTitle="General Aptitude" list={GAT} selected={subjectsTaken} toggle={toggleSubject} accent="from-brand-400 to-brand-700" />
+            {subjectsTaken.length > 0 && (
+              <p className="mt-2 text-xs text-brand-700 font-medium">
+                ✓ {subjectsTaken.length} subject{subjectsTaken.length === 1 ? '' : 's'} selected
+              </p>
+            )}
           </Step>
 
           {/* STEP 2 ============================= */}
           <Step n={2} title="Enter your NTA normalised scores">
             {subjectsTaken.length === 0 ? (
-              <div className="text-sm text-slate-500">Select subjects in Step 1 to enter scores.</div>
+              <div className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded-lg border border-slate-200">
+                ⬆️ First select subjects in Step 1, then score inputs will appear here.
+              </div>
             ) : (
               <div className="grid sm:grid-cols-2 gap-3">
                 {subjectsTaken.map(code => {
@@ -156,28 +205,71 @@ export default function Home() {
             </div>
           </Step>
 
-          {/* STEP 4 ============================= */}
-          <Step n={4} title="Your name (optional)">
+          {/* STEP 4 ============================= NAME (REQUIRED) */}
+          <Step n={4} title="Your name *">
             <input type="text" value={name} onChange={(e)=>setName(e.target.value)}
               placeholder="e.g. Aarav Sharma"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white" />
-            <p className="text-xs text-slate-400 mt-1.5">Used only to personalise your results card.</p>
+              className={`w-full px-4 py-2.5 rounded-xl border bg-white
+                ${name.trim().length >= 2
+                  ? 'border-emerald-300'
+                  : 'border-slate-200'}`} />
+            <p className="text-xs text-slate-500 mt-1.5">
+              {name.trim().length >= 2
+                ? <span className="text-emerald-700">✓ Looks good</span>
+                : <span className="text-slate-400">Required — used to personalise your results.</span>}
+            </p>
           </Step>
 
-          {/* STEP 5 ============================= */}
+          {/* STEP 5 ============================= SEARCHABLE DREAM PICKER */}
           <Step n={5} title="Your dream college + course (optional)">
-            <input type="text" value={searchDream} onChange={(e)=>setSearchDream(e.target.value)}
-              placeholder="Search e.g. SSCBS, Hindu B.A. Eco, SRCC B.Com…"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white mb-2" />
-            <select value={dreamId} onChange={(e)=>setDreamId(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white max-h-72">
-              <option value="">— No specific dream (rank all) —</option>
-              {filteredDreams.map(o => (
-                <option key={o.id} value={o.id}>{o.label}</option>
-              ))}
-            </select>
+            <div ref={dropdownRef} className="relative">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchDream}
+                  onFocus={()=>setShowDropdown(true)}
+                  onChange={(e)=>{ setSearchDream(e.target.value); setShowDropdown(true); if (!e.target.value) clearDream(); }}
+                  placeholder={subjectsTaken.length === 0 ? "Select subjects first…" : "Type to search e.g. SSCBS, SRCC, Hindu, Hansraj, B.Com Hons…"}
+                  disabled={subjectsTaken.length === 0}
+                  className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                />
+                {searchDream && (
+                  <button type="button" onClick={clearDream}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-lg">×</button>
+                )}
+              </div>
+
+              {showDropdown && subjectsTaken.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                  {filteredDreams.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-slate-500">No programs match "{searchDream}".</div>
+                  ) : (
+                    filteredDreams.map(o => (
+                      <button key={o.id} type="button" onClick={()=>selectDream(o)}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-brand-50 border-b border-slate-100 last:border-0
+                          ${String(o.id) === dreamId ? 'bg-brand-100 text-brand-900 font-medium' : 'text-slate-700'}`}>
+                        {o.label}
+                      </button>
+                    ))
+                  )}
+                  {searchDream.trim() === '' && dreamOptions.length > 150 && (
+                    <div className="px-4 py-2 text-xs text-slate-400 bg-slate-50 border-t border-slate-200">
+                      Showing first 150 of {dreamOptions.length.toLocaleString()}. Type to search the rest.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {dreamLabel && dreamId && (
+              <div className="mt-2 text-xs text-emerald-700 font-medium">
+                ✓ Dream selected: {dreamLabel}
+              </div>
+            )}
             <p className="text-xs text-slate-400 mt-1.5">
-              {dreamOptions.length.toLocaleString()} programs match your subject combination.
+              {subjectsTaken.length === 0
+                ? 'Pick subjects in Step 1 to unlock the college list.'
+                : `${dreamOptions.length.toLocaleString()} programs across DU match your subject combination.`}
             </p>
           </Step>
 
@@ -189,6 +281,13 @@ export default function Home() {
               disabled:opacity-50 disabled:cursor-not-allowed">
             {busy ? 'Crunching numbers…' : '🎯 Calculate my chances'}
           </button>
+          {!canSubmit && (
+            <p className="text-xs text-center text-slate-500">
+              {name.trim().length < 2 && '· Enter your name '}
+              {subjectsTaken.length === 0 && '· Pick at least 1 subject '}
+              {subjectsTaken.length > 0 && !subjectsTaken.every(c => typeof scores[c] === 'number') && '· Fill in all scores '}
+            </p>
+          )}
         </div>
 
         {/* ===== SIDEBAR — Why trust this ===== */}
