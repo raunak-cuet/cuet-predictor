@@ -34,12 +34,10 @@ export default function RootLayout({ children }) {
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
               <nav className="card flex items-center justify-between px-4 sm:px-6 py-3">
                 <a href="/" className="flex items-center gap-3 group">
-                  <img src="/stars-icon-rounded.png" alt="DreamSeat"
-                       className="h-10 w-10 rounded-[10px] shadow-sm" />
                   <div className="leading-tight">
                     <img src="/dreamseat-wordmark.png" alt="DreamSeat"
-                         className="h-5 sm:h-6 w-auto" />
-                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-0.5">
+                         className="h-9 sm:h-11 w-auto block" />
+                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1">
                       CUET 2026 College &amp; Cutoff Predictor
                     </div>
                   </div>
