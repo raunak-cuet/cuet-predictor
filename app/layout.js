@@ -32,12 +32,12 @@ export default function RootLayout({ children }) {
           {/* ============= NAVBAR ============= */}
           <header className="sticky top-0 z-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
-              <nav className="card flex items-center justify-between px-4 sm:px-6 py-3">
+              <nav className="card flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
                 <a href="/" className="flex items-center gap-3 group">
                   <div className="leading-tight">
                     <img src="/dreamseat-wordmark.png" alt="DreamSeat"
-                         className="h-9 sm:h-11 w-auto block" />
-                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1">
+                         className="h-9 sm:h-12 w-auto block" />
+                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1.5">
                       CUET 2026 College &amp; Cutoff Predictor
                     </div>
                   </div>
