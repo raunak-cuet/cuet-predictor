@@ -104,10 +104,10 @@ export default function Home() {
             Now projecting 2026 DU cutoffs
           </span>
         </div>
-        <h1 className="mt-6 font-display text-[2.2rem] leading-[1.08] sm:text-6xl lg:text-7xl sm:leading-[1.0] text-slate-900 max-w-[24ch] sm:max-w-[28ch] mx-auto">
-          Stop guessing your DU rank.{' '}
+        <h1 className="mt-6 font-display text-[1.75rem] sm:text-4xl md:text-5xl lg:text-[3.5rem] leading-[1.15] sm:leading-[1.1] text-slate-900 mx-auto px-2">
+          Stop guessing your DU rank.<br />
           <span className="italic relative inline-block">
-            Let data science
+            Let data science calculate your real odds.
             <svg className="absolute -bottom-2 left-0 w-full" height="14" viewBox="0 0 300 14" fill="none" preserveAspectRatio="none">
               <path d="M2 9c50-6 100-6 150 0s100 6 146 0" stroke="url(#g)" strokeWidth="3" strokeLinecap="round" />
               <defs>
@@ -116,8 +116,7 @@ export default function Home() {
                 </linearGradient>
               </defs>
             </svg>
-          </span>{' '}
-          calculate your real odds.
+          </span>
         </h1>
         <p className="mt-6 text-base sm:text-lg text-slate-600 max-w-3xl mx-auto">
           A 12-factor statistical engine that <b className="text-slate-900">projects 2026 cutoffs</b> and your real admission chances across <b className="text-slate-900">1,526 college-program combinations</b> at Delhi University.

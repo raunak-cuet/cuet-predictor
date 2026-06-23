@@ -393,7 +393,6 @@ body {
 .font-display {
   font-family: 'Instrument Serif', 'Playfair Display', Georgia, serif;
   letter-spacing: -0.02em;
-  text-wrap: balance;     /* evenly distribute lines on supported browsers */
 }
 
 /* ============================================================
