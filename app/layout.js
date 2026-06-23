@@ -34,7 +34,9 @@ export default function RootLayout({ children }) {
           <header className="sticky top-0 z-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
               <nav className="card flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-                <a href="/" className="flex items-center gap-3 group">
+                <a href="/" className="flex items-center gap-3 sm:gap-4 group">
+                  <img src="/stars-icon-rounded.png" alt=""
+                       className="h-11 w-11 sm:h-14 sm:w-14 rounded-[12px] shadow-sm shrink-0" />
                   <div className="leading-tight">
                     <Logo />
                     <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1">
