@@ -45,6 +45,8 @@ export default function ResultsPage() {
         <AllResults results={results} dreamId={dream?.id} />
       </section>
 
+      <ImportantDisclaimer />
+
       <DisclaimerCard />
     </div>
   );
@@ -671,15 +673,87 @@ function toneToBar(t) {
   return { safe: 'safe', good: 'good', mid: 'mid', risk: 'risk', reach: 'reach' }[t] || 'good';
 }
 
-function DisclaimerCard() {
+/* ============================================================
+   IMPORTANT DISCLAIMER — full, prominent, beautifully organised
+   ============================================================ */
+function ImportantDisclaimer() {
   return (
-    <div className="card p-5 bg-gradient-to-br from-amber-50/60 to-white border-amber-200">
-      <div className="flex gap-3 items-start">
-        <div className="text-2xl">⚠️</div>
-        <div className="text-sm text-amber-900">
-          <b>Statistical estimates only.</b> Projections come from real CUET 2025/2026 NTA data + DU 2025-26 Round 1 cutoffs. Actual 2026 cutoffs depend on who applies, preference orders, withdrawals, and DU/CSAS policy. Use as guidance — verify with the official DU Bulletin of Information.
+    <section className="disclaimer-shell">
+      {/* Header band */}
+      <div className="disclaimer-header">
+        <div className="disclaimer-icon">!</div>
+        <div>
+          <div className="disclaimer-eyebrow">Please read carefully</div>
+          <h2 className="disclaimer-title">Important Disclaimer</h2>
         </div>
       </div>
+
+      <div className="disclaimer-body">
+
+        {/* ----- Paragraph 1: What this is ----- */}
+        <p>
+          The probabilities, projected cutoffs, ranks, and admission chances shown on this platform are
+          <b> estimates </b>based on historical cutoff trends, official CUET data, seat matrices, candidate pool
+          statistics, category-wise competition, and other publicly available information.
+        </p>
+
+        {/* ----- Paragraph 2: Not a guarantee ----- */}
+        <p>
+          These predictions are <b>not official</b> and should not be treated as a guarantee of admission or
+          rejection. The actual cutoffs released by Delhi University may be higher or lower than our projections
+          due to factors that cannot be predicted with complete certainty, including student preference patterns,
+          seat movement, counselling behaviour, normalization effects, vacant seats, category-wise demand, and
+          round-wise allocation changes.
+        </p>
+
+        {/* ----- HIGHLIGHTED RULE — the most important thing ----- */}
+        <div className="disclaimer-rule">
+          <div className="disclaimer-rule-label">★ Most important</div>
+          <p className="disclaimer-rule-text">
+            <b>Never</b> arrange your CSAS preference list according to predicted chances alone.
+          </p>
+          <p className="disclaimer-rule-sub">
+            Always place colleges and courses in the <b>exact order of what you genuinely want.</b>
+            <br />
+            If your dream college is your first choice, keep it at the top — even if the prediction appears uncertain.
+          </p>
+        </div>
+
+        {/* ----- The mechanism ----- */}
+        <p>
+          Delhi University considers your <b>preference order</b> during seat allocation. If you place a
+          lower-preference college above a college that you actually prefer, you may be allotted the lower-preference
+          option and lose the opportunity to be considered for the higher-preference college — even if your score
+          was sufficient for it.
+        </p>
+
+        {/* ----- The safety tip in a soft callout ----- */}
+        <div className="disclaimer-tip">
+          <div className="disclaimer-tip-label">💡 Pro tip</div>
+          <p>
+            You are <b>not penalised</b> for adding ambitious preferences. Since there is no practical disadvantage
+            to including colleges with lower predicted chances, it is generally advisable to include every college
+            and course you would <b>genuinely be willing to join</b>.
+          </p>
+        </div>
+
+        {/* ----- Closing ----- */}
+        <p className="disclaimer-closing">
+          Use these predictions as <b>guidance, not as a substitute for your own preference order.</b>
+          <br />
+          The final admission decision rests solely with <b>Delhi University</b> and the official
+          <b> CSAS counselling process.</b>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/* Minimal trailing footnote — kept short so the big disclaimer above remains the hero */
+function DisclaimerCard() {
+  return (
+    <div className="text-center text-[11px] text-slate-400 px-4">
+      Built on public NTA CUET 2025 / 2026 data &amp; DU 2025-26 Round 1 cutoffs · Always verify with the official DU Bulletin of Information.
     </div>
   );
 }
