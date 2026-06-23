@@ -27,7 +27,10 @@ export default function AdminPage() {
     setErr('');
     setBusy(true);
     try {
-      const r = await fetch(`/api/admin/entries?password=${encodeURIComponent(pwd)}`);
+      const r = await fetch(
+        `/api/admin/entries?password=${encodeURIComponent(pwd)}&_t=${Date.now()}`,
+        { cache: 'no-store' }
+      );
       const j = await r.json();
       if (!r.ok) {
         setErr(j.error || 'Login failed');
@@ -46,7 +49,11 @@ export default function AdminPage() {
 
   async function refresh() {
     try {
-      const r = await fetch(`/api/admin/entries?password=${encodeURIComponent(pwd)}`);
+      // Cache bust: append a unique timestamp + tell fetch to bypass HTTP cache
+      const r = await fetch(
+        `/api/admin/entries?password=${encodeURIComponent(pwd)}&_t=${Date.now()}`,
+        { cache: 'no-store' }
+      );
       const j = await r.json();
       if (r.ok) {
         setSummary(j.summary);

@@ -52,9 +52,19 @@ export async function GET(req) {
     ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length * 100) / 100
     : null;
 
-  return NextResponse.json({
-    ok: true,
-    summary: { total, today: todayCount, popular, avg },
-    entries: data
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      summary: { total, today: todayCount, popular, avg },
+      entries: data
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+      }
+    }
+  );
 }
