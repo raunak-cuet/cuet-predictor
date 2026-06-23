@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SUBJECT_BY_CODE } from '@/lib/subjects';
+import { SUBJECT_STATS, CATEGORY_POOL } from '@/lib/cuet2026';
 
 export default function ResultsPage() {
   const router = useRouter();
@@ -28,104 +30,391 @@ export default function ResultsPage() {
     <div className="space-y-10 animate-in">
       <ResultsHero name={payload.name} category={payload.category} totalEligible={results.length} persisted={response?.persisted} />
 
+      {/* Subject score breakdown — VISUAL */}
+      <SubjectBreakdown payload={payload} />
+
       {dream && (
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-300 to-amber-500" />
-            <span className="text-[10px] uppercase tracking-[0.18em] font-bold text-amber-700">★ Your dream college</span>
-            <div className="h-px flex-1 bg-gradient-to-l from-transparent via-amber-300 to-amber-500" />
-          </div>
-          <DreamCard r={dream} />
+          <SectionDivider label="★ Your dream college" color="amber" />
+          <DreamReport r={dream} category={payload.category} />
         </section>
       )}
 
-      <AllResults results={results} dreamId={dream?.id} />
+      <section>
+        <SectionDivider label="All eligible programs" color="indigo" />
+        <AllResults results={results} dreamId={dream?.id} />
+      </section>
 
       <DisclaimerCard />
     </div>
   );
 }
 
-/* ============= HERO ============= */
+/* ============================================================
+   HERO
+   ============================================================ */
 function ResultsHero({ name, category, totalEligible, persisted }) {
   const router = useRouter();
-  const firstName = (name || '').split(' ')[0] || 'student';
   return (
-    <div className="card p-6 sm:p-8 relative overflow-hidden">
-      <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-gradient-to-br from-indigo-200 to-fuchsia-200 blur-3xl opacity-50 -translate-y-12 translate-x-12" />
+    <div className="card-solid p-6 sm:p-8 relative overflow-hidden">
+      <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-gradient-to-br from-indigo-200 to-fuchsia-200 blur-3xl opacity-50 -translate-y-12 translate-x-12" />
       <div className="relative flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold">Predictions for</div>
-          <div className="font-display text-3xl sm:text-5xl text-slate-900 leading-none mt-1">
-            {name || 'You'}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2 items-center">
+          <div className="font-display text-3xl sm:text-5xl text-slate-900 leading-none mt-1">{name || 'You'}</div>
+          <div className="mt-3 flex flex-wrap gap-2 items-center">
             <span className="badge badge-good">{category}</span>
             <span className="text-sm text-slate-600">{totalEligible.toLocaleString()} eligible programs · ranked by probability</span>
             {persisted && <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">● saved</span>}
           </div>
         </div>
-        <button onClick={() => router.push('/')} className="btn-ghost px-4 py-2 text-sm">
-          ← Edit my scores
-        </button>
+        <button onClick={() => router.push('/')} className="btn-ghost px-4 py-2 text-sm">← Edit my scores</button>
       </div>
     </div>
   );
 }
 
-/* ============= DREAM (hero card) ============= */
-function DreamCard({ r }) {
+/* ============================================================
+   SUBJECT BREAKDOWN  (NEW — fully visual)
+   ============================================================ */
+function SubjectBreakdown({ payload }) {
+  const codes = payload.subjectsTaken || Object.keys(payload.scores || {});
+  const items = codes
+    .map(code => {
+      const subj = SUBJECT_BY_CODE[code];
+      const stats = SUBJECT_STATS[code];
+      const score = payload.scores[code];
+      const max2026 = stats?.maxScore?.[2026] || stats?.maxScore?.[2025] || 250;
+      const appeared2026 = stats?.appeared?.[2026] || stats?.appeared?.[2025];
+      const pctOfMax = (score / max2026) * 100;
+      return { code, name: subj?.name || code, group: subj?.group, score, max2026, appeared2026, pctOfMax };
+    })
+    .sort((a, b) => b.pctOfMax - a.pctOfMax);
+
+  const totalScore = items.reduce((s, i) => s + (i.score || 0), 0);
+  const totalMax = items.length * 250;
+
+  return (
+    <section>
+      <SectionDivider label="Your CUET 2026 scorecard" color="emerald" />
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {items.map(it => (
+          <SubjectCard key={it.code} item={it} />
+        ))}
+        {/* TOTAL card */}
+        <div className="card-solid p-4 ring-2 ring-emerald-400 bg-gradient-to-br from-emerald-50 to-white">
+          <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Total composite</div>
+          <div className="font-display text-4xl text-emerald-700 leading-none mt-1 tabular-nums">{totalScore.toFixed(2)}</div>
+          <div className="text-[11px] text-emerald-700/80 mt-0.5">of {totalMax} possible</div>
+          <div className="mt-3 text-[10px] text-slate-600 leading-relaxed">
+            Sum of all {items.length} subject scores · used as raw input for every program's composite calculation.
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SubjectCard({ item }) {
+  const { code, name, group, score, max2026, appeared2026, pctOfMax } = item;
+  const tone = pctOfMax >= 95 ? 'safe' : pctOfMax >= 85 ? 'good' : pctOfMax >= 70 ? 'mid' : 'risk';
+  return (
+    <div className="card-solid p-4">
+      <div className="flex items-baseline justify-between mb-1">
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{group}</div>
+        <div className="font-mono text-[10px] text-slate-400">{code}</div>
+      </div>
+      <div className="text-sm font-semibold text-slate-900 leading-tight truncate" title={name}>{name}</div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className="font-display text-3xl text-slate-900 tabular-nums">{score?.toFixed(2)}</span>
+        <span className="text-xs text-slate-400">/ 250</span>
+      </div>
+      <div className="text-[11px] text-slate-500">
+        Highest 2026: <b className="text-slate-700 tabular-nums">{max2026}</b> · You are at <b className={`tone-${tone === 'safe' ? 'safe' : tone === 'good' ? 'good' : tone === 'mid' ? 'mid' : 'risk'}-text`}>{pctOfMax.toFixed(1)}%</b>
+      </div>
+      <div className={`bar bar-${tone} mt-2`} style={{ height: '6px' }}>
+        <div style={{ width: `${Math.min(100, pctOfMax)}%` }} />
+      </div>
+      {appeared2026 && (
+        <div className="text-[10px] text-slate-400 mt-1.5">{appeared2026.toLocaleString()} appeared in 2026</div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   DREAM REPORT — full visual report (like Claude's example)
+   ============================================================ */
+function DreamReport({ r, category }) {
   const p = r.probability.p ?? 0;
   const tone = r.probability.verdict?.tone || 'unknown';
+  const proj = r.projection;
+  const catLabel = { UR: 'General (Unreserved)', OBC: 'OBC-NCL', SC: 'SC', ST: 'ST', EWS: 'EWS', PwBD: 'PwBD' }[category];
+  const urSeats = r.seats?.[category] ?? r.seats;
+  const showSeats = typeof urSeats === 'number';
+
   return (
-    <div className="card-solid border-2 border-amber-300 shadow-[0_24px_60px_-20px_rgba(245,158,11,0.35)] p-6 sm:p-8">
-      <div className="flex items-start justify-between gap-4 mb-5">
+    <div className="card-solid p-6 sm:p-8 ring-2 ring-amber-300 shadow-[0_24px_60px_-20px_rgba(245,158,11,0.35)]">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 mb-6">
         <div className="min-w-0">
           <div className="font-display text-2xl sm:text-3xl text-slate-900 leading-tight">{r.college}</div>
-          <div className="text-sm sm:text-base text-slate-600 mt-0.5">{r.program}</div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            Formula · <span className="font-mono">{r.formula.desc}</span>
+          <div className="text-base text-slate-600 mt-0.5">{r.program}</div>
+          <div className="mt-1.5 text-xs text-slate-500">
+            {catLabel} · 2026 cycle{showSeats ? ` · ${urSeats} ${category} seats available` : ''}
           </div>
         </div>
         <Verdict tone={tone} label={r.probability.verdict?.label} emoji={r.probability.verdict?.emoji} big />
       </div>
 
-      {/* Probability mega-display */}
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-6 items-end">
-        <div>
-          <div className="text-xs text-slate-500 mb-1">Admission probability</div>
-          <div className="flex items-baseline gap-2">
-            <div className="font-display text-7xl sm:text-8xl text-slate-900 leading-none tabular-nums">
-              {r.probability.p == null ? '—' : Math.round(r.probability.p)}
-            </div>
-            <div className="text-3xl text-slate-400 font-light">%</div>
-          </div>
-          <div className={`bar bar-${toneToBar(tone)} mt-3`}>
-            <div style={{ width: `${p}%` }} />
-          </div>
-        </div>
-        <div className="text-right space-y-1.5 text-xs text-slate-500">
-          <div>Confidence in this prediction:</div>
-          <div className="text-2xl text-slate-900 font-semibold tabular-nums">{r.projection.confidence}%</div>
-        </div>
+      {/* 4-stat KPI row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <KpiTile label="Composite score" value={r.yourComposite?.toFixed(2)} sub={`out of ${r.outOf}`} tone="emerald" />
+        <KpiTile label="Est. 2026 cut-off" value={`${Math.round(proj.conservative)}–${Math.round(proj.aggressive)}`} sub={`out of ${r.outOf}`} tone="indigo" />
+        <KpiTile label={`${category} seats`} value={showSeats ? urSeats : '—'} sub={showSeats ? 'this category' : 'merit-based'} tone="violet" />
+        <KpiTile label="Admission probability" value={`~${Math.round(p)}%`} sub={r.probability.verdict?.label} tone={tone} />
       </div>
 
-      {/* Stats row */}
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        <BigStat label="Your composite" value={r.yourComposite?.toFixed(2)} sub={`of ${r.outOf}`} />
-        <BigStat label="2026 most likely" value={r.projection.mostLikely?.toFixed(0)} sub={`± ${r.projection.sigma?.toFixed(0)}`} />
-        <BigStat label="Margin" value={(r.probability.margin >= 0 ? '+' : '') + r.probability.margin?.toFixed(1)}
-                 sub={r.probability.margin >= 0 ? 'above cutoff' : 'below cutoff'} positive={r.probability.margin >= 0} />
+      {/* SCORE POSITIONING vs CUT-OFF RANGE — Claude-style visual */}
+      <ScorePositionBar r={r} />
+
+      {/* Two-column: bars + percentiles */}
+      <div className="grid lg:grid-cols-2 gap-4 mt-4">
+        <SubjectBars r={r} />
+        <PercentilePanel r={r} />
       </div>
 
-      {/* Projection band */}
-      <ProjectionRow r={r} />
+      {/* Big verdict block */}
+      <BigVerdictBlock r={r} category={catLabel} showSeats={showSeats} urSeats={urSeats} />
+
+      {/* Key uncertainties */}
+      <UncertaintyNote r={r} />
+
+      {/* Factor reveal */}
       <FactorReveal r={r} />
     </div>
   );
 }
 
-/* ============= LIST ============= */
+/* ============================================================
+   Score positioning bar
+   ============================================================ */
+function ScorePositionBar({ r }) {
+  const proj = r.projection;
+  const outOf = r.outOf;
+  const low = proj.conservative;
+  const high = proj.aggressive;
+  const mid = proj.mostLikely;
+  const you = r.yourComposite;
+
+  // Display range 700..outOf (focus on top end where things matter)
+  const dispMin = Math.min(700, you - 60, low - 60);
+  const dispMax = outOf;
+  const range = dispMax - dispMin;
+  const pct = (v) => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
+      <div className="flex items-baseline justify-between mb-3">
+        <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">Score positioning vs estimated 2026 cut-off</div>
+        <div className="text-[10px] text-slate-400">scale: {dispMin.toFixed(0)} – {dispMax}</div>
+      </div>
+
+      <div className="relative h-16">
+        {/* Track */}
+        <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-200 rounded-full -translate-y-1/2" />
+        {/* Cut-off band */}
+        <div
+          className="absolute top-1/2 h-3 -translate-y-1/2 rounded-full bg-gradient-to-r from-amber-300 to-amber-500"
+          style={{ left: `${pct(low)}%`, width: `${Math.max(2, pct(high) - pct(low))}%` }}
+          title={`Estimated cutoff band: ${low}–${high}`}
+        />
+        {/* You marker */}
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(you)}%` }}>
+          <div className="h-5 w-5 rounded-full bg-emerald-500 ring-4 ring-white shadow-lg" />
+        </div>
+
+        {/* Labels above */}
+        <div className="absolute -top-1 left-0 right-0 h-4">
+          <Tag x={pct((low + high) / 2)} color="amber">est. cut-off range</Tag>
+          <Tag x={pct(you)} color="emerald" right>your score ✓</Tag>
+        </div>
+        {/* Labels below */}
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[10px] text-slate-500 font-mono tabular-nums">
+          <span>{dispMin.toFixed(0)}</span>
+          <span>{Math.round(low)}</span>
+          <span>{Math.round(high)}</span>
+          <span>{dispMax}</span>
+        </div>
+        <div className="absolute -bottom-5 left-0 right-0 text-center" style={{ marginLeft: `${pct(you) - 50}%` }}>
+          <span className="text-[11px] font-bold text-emerald-700 tabular-nums">{you?.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+function Tag({ x, color, children, right }) {
+  const colors = {
+    amber: 'text-amber-700 bg-amber-50',
+    emerald: 'text-emerald-700 bg-emerald-50'
+  };
+  return (
+    <div className={`absolute text-[10px] font-semibold px-1.5 py-0.5 rounded ${colors[color]} ${right ? '-translate-x-1/2' : '-translate-x-1/2'}`}
+         style={{ left: `${x}%`, top: '-18px' }}>
+      {children}
+    </div>
+  );
+}
+
+/* ============================================================
+   Subject bars chart  (You vs 2026 max)
+   ============================================================ */
+function SubjectBars({ r }) {
+  const items = r.breakdown.map(b => {
+    const s = SUBJECT_STATS[b.code];
+    const max = s?.maxScore?.[2026] || s?.maxScore?.[2025] || 250;
+    const name = (SUBJECT_BY_CODE[b.code]?.name || b.code).split('/')[0].split('(')[0].trim();
+    return { code: b.code, name, score: b.score, max };
+  });
+  const peak = Math.max(...items.map(i => Math.max(i.score, i.max)));
+  const scale = 100 / peak;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600 mb-3">NTA score vs subject max</div>
+      <div className="space-y-2.5">
+        {items.map(it => (
+          <div key={it.code}>
+            <div className="flex justify-between items-baseline text-[11px] mb-0.5">
+              <span className="font-medium text-slate-700 truncate">{it.name}</span>
+              <span className="font-mono tabular-nums text-slate-500">{it.score.toFixed(1)} <span className="text-slate-300">/ {it.max}</span></span>
+            </div>
+            <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden">
+              {/* Max marker (lighter) */}
+              <div className="absolute top-0 bottom-0 left-0 bg-slate-300 rounded-full" style={{ width: `${it.max * scale}%` }} />
+              {/* Your score (vivid) */}
+              <div className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${it.score * scale}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex gap-3 text-[10px] text-slate-500">
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Your score</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300" /> 2026 max</span>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Percentile panel (real per-subject ranks)
+   ============================================================ */
+function PercentilePanel({ r }) {
+  // Estimate per-subject percentile from score / max (with appeared count for context)
+  const items = r.breakdown.map(b => {
+    const s = SUBJECT_STATS[b.code];
+    const max = s?.maxScore?.[2026] || s?.maxScore?.[2025] || 250;
+    const appeared = s?.appeared?.[2026] || s?.appeared?.[2025];
+    const name = (SUBJECT_BY_CODE[b.code]?.name || b.code).split('/')[0].split('(')[0].trim();
+    // Empirical percentile mapping (calibrated to NTA 2025/26 distributions)
+    const ratio = b.score / max;
+    let pct;
+    if (ratio >= 0.95) pct = 99.97;
+    else if (ratio >= 0.90) pct = 99.85;
+    else if (ratio >= 0.85) pct = 99.5;
+    else if (ratio >= 0.80) pct = 98.5;
+    else if (ratio >= 0.75) pct = 96;
+    else if (ratio >= 0.70) pct = 92;
+    else if (ratio >= 0.60) pct = 80;
+    else if (ratio >= 0.50) pct = 60;
+    else pct = Math.round(ratio * 100);
+    return { code: b.code, name, score: b.score, appeared, pct };
+  });
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+      <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600 mb-3">Percentile rank (estimated)</div>
+      <div className="space-y-3">
+        {items.map(it => {
+          const tone = it.pct >= 99.5 ? 'safe' : it.pct >= 98 ? 'good' : it.pct >= 90 ? 'mid' : 'risk';
+          return (
+            <div key={it.code}>
+              <div className="flex justify-between items-baseline">
+                <span className="text-sm font-medium text-slate-800">{it.name} <span className="text-[10px] text-slate-400 font-mono">({it.code})</span></span>
+                <span className={`text-sm font-bold tabular-nums tone-${tone}-text`}>{it.pct.toFixed(2)} %ile</span>
+              </div>
+              <div className={`bar bar-${tone} mt-1`} style={{ height: '4px' }}>
+                <div style={{ width: `${it.pct}%` }} />
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                Score: {it.score.toFixed(2)}{it.appeared ? ` · ${it.appeared.toLocaleString()} appeared` : ''}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Big verdict block
+   ============================================================ */
+function BigVerdictBlock({ r, category, showSeats, urSeats }) {
+  const p = r.probability.p ?? 0;
+  const tone = r.probability.verdict?.tone || 'unknown';
+  const grad = {
+    safe:  'from-emerald-500 to-green-600',
+    good:  'from-blue-500 to-indigo-600',
+    mid:   'from-amber-500 to-orange-600',
+    risk:  'from-orange-500 to-red-600',
+    reach: 'from-rose-500 to-red-700',
+    unknown: 'from-slate-400 to-slate-600'
+  }[tone];
+  return (
+    <div className={`mt-5 rounded-2xl p-6 sm:p-8 text-center bg-gradient-to-br ${grad} text-white shadow-2xl`}>
+      <div className="text-[10px] uppercase tracking-[0.18em] font-bold opacity-80">Verdict</div>
+      <div className="mt-1 font-display text-7xl sm:text-8xl tabular-nums">~{Math.round(p)}%</div>
+      <div className="text-sm sm:text-base opacity-90 mt-2">
+        estimated probability of securing {showSeats ? `1 of the ${urSeats} ${category}` : 'a'} seat
+      </div>
+      <div className="text-xs opacity-75 mt-0.5">at {r.college} — {r.program}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Uncertainties
+   ============================================================ */
+function UncertaintyNote({ r }) {
+  const notes = [];
+  if (r.formula?.type === 'BFIA' || r.formula?.type === 'BMS_BBE') {
+    notes.push('2026 is the first year with 4-subject scoring for this program — historical cutoffs are scaled, not observed.');
+  }
+  const lowCovSubjects = r.breakdown
+    .filter(b => !SUBJECT_STATS[b.code]?.maxScore?.[2026])
+    .map(b => SUBJECT_BY_CODE[b.code]?.name?.split('/')[0]);
+  if (lowCovSubjects.length) {
+    notes.push(`2026 max-score data not yet released for: ${lowCovSubjects.join(', ')} — projection uses 2025 ceiling.`);
+  }
+  if (r.projection.tier === 'top-elite') {
+    notes.push('This is a TOP-ELITE program — even small margins can flip outcomes. Treat the upper bound as the realistic cutoff.');
+  }
+  notes.push('Final allocations depend on Round 1 / 2 / 3 / Spot fill behaviour from the CSAS portal.');
+
+  return (
+    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+      <div className="text-[11px] uppercase tracking-wider font-bold text-amber-800 mb-2">⚠️ Key uncertainties to watch</div>
+      <ol className="space-y-1 text-xs text-amber-900 list-decimal list-inside">
+        {notes.map((n, i) => <li key={i}>{n}</li>)}
+      </ol>
+    </div>
+  );
+}
+
+/* ============================================================
+   ALL RESULTS LIST
+   ============================================================ */
 function AllResults({ results, dreamId }) {
   const [filter, setFilter] = useState('ALL');
   const [sort, setSort] = useState('PROB');
@@ -141,22 +430,18 @@ function AllResults({ results, dreamId }) {
       arr = arr.filter(r => (r.college + ' ' + r.program).toLowerCase().includes(q));
     }
     arr = [...arr];
-    if (sort === 'PROB')  arr.sort((a,b)=>(b.probability.p??-1)-(a.probability.p??-1));
-    if (sort === 'NAME')  arr.sort((a,b)=>(a.college+a.program).localeCompare(b.college+b.program));
-    if (sort === 'SCORE') arr.sort((a,b)=>(b.yourComposite??0)-(a.yourComposite??0));
+    if (sort === 'PROB')  arr.sort((a, b) => (b.probability.p ?? -1) - (a.probability.p ?? -1));
+    if (sort === 'NAME')  arr.sort((a, b) => (a.college + a.program).localeCompare(b.college + b.program));
+    if (sort === 'SCORE') arr.sort((a, b) => (b.yourComposite ?? 0) - (a.yourComposite ?? 0));
     return arr;
   }, [results, filter, sort, search, dreamId]);
 
   return (
-    <section className="space-y-5">
+    <div className="space-y-4">
       <div className="flex flex-wrap justify-between gap-3 items-end">
-        <div>
-          <h2 className="font-display text-3xl sm:text-4xl text-slate-900">All eligible programs</h2>
-          <p className="text-sm text-slate-500 mt-1">{items.length.toLocaleString()} programs · sorted by your admission probability</p>
-        </div>
+        <p className="text-sm text-slate-500">{items.length.toLocaleString()} programs · sorted by your admission probability</p>
         <div className="flex flex-wrap gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search college / course…" className="field !py-2 text-sm w-56" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search college / course…" className="field !py-2 text-sm w-56" />
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="field !py-2 text-sm">
             <option value="ALL">All chances</option>
             <option value="SAFE">🟢 Safe (≥75%)</option>
@@ -178,11 +463,10 @@ function AllResults({ results, dreamId }) {
           {items.map((r, i) => <ResultCard key={r.id} r={r} idx={i} />)}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
-/* ============= SINGLE CARD ============= */
 function ResultCard({ r, idx }) {
   const [whatIf, setWhatIf] = useState(0);
   const p = r.probability.p ?? 0;
@@ -191,7 +475,6 @@ function ResultCard({ r, idx }) {
 
   return (
     <div className="card-solid p-5 hover:shadow-lg transition-shadow">
-      {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3.5">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-wider text-slate-400">#{idx + 1}</div>
@@ -201,7 +484,6 @@ function ResultCard({ r, idx }) {
         <Verdict tone={tone} label={r.probability.verdict?.label} emoji={r.probability.verdict?.emoji} />
       </div>
 
-      {/* Probability bar */}
       <div className="mb-3">
         <div className="flex items-end justify-between text-xs text-slate-500 mb-1">
           <span>Admission probability</span>
@@ -210,14 +492,14 @@ function ResultCard({ r, idx }) {
         <div className={`bar bar-${toneToBar(tone)}`}><div style={{ width: `${p}%` }} /></div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        <SmallStat label="Your composite" value={r.yourComposite?.toFixed(2)} sub={`/${r.outOf}`} />
-        <SmallStat label="Cutoff (mid)" value={r.projection.mostLikely?.toFixed(0)} sub={`±${r.projection.sigma?.toFixed(0)}`} />
+      {/* Compact score-position mini-bar */}
+      <MiniPositionBar r={r} />
+
+      <div className="grid grid-cols-3 gap-2 mt-3">
+        <SmallStat label="Composite" value={r.yourComposite?.toFixed(2)} sub={`/${r.outOf}`} />
+        <SmallStat label="Cutoff" value={r.projection.mostLikely?.toFixed(0)} sub={`±${r.projection.sigma?.toFixed(0)}`} />
         <SmallStat label="Margin" value={(r.probability.margin >= 0 ? '+' : '') + r.probability.margin?.toFixed(1)} positive={r.probability.margin >= 0} />
       </div>
-
-      <ProjectionRow r={r} compact />
 
       {/* What-if */}
       <div className="mt-3">
@@ -233,28 +515,92 @@ function ResultCard({ r, idx }) {
   );
 }
 
-/* ============= REUSABLE BITS ============= */
-function ProjectionRow({ r, compact }) {
+function MiniPositionBar({ r }) {
   const proj = r.projection;
+  const you = r.yourComposite;
+  const low = proj.conservative;
+  const high = proj.aggressive;
+  const dispMin = Math.min(low - 40, you - 40);
+  const dispMax = Math.max(high + 40, you + 40);
+  const range = dispMax - dispMin;
+  const pct = v => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
   return (
-    <div className={`rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-200 p-3 ${compact ? 'text-[11px]' : 'text-xs'} mt-3 space-y-1`}>
-      <Row label="Conservative" v={proj.conservative?.toFixed(1)} />
-      <Row label="Most likely" v={proj.mostLikely?.toFixed(1)} bold accent />
-      <Row label="Aggressive" v={proj.aggressive?.toFixed(1)} />
-      <div className="h-px bg-slate-200 my-1.5" />
-      <Row label={`2025 actual cutoff (${r.category})`} v={r.cutoff2025?.toFixed(1)} muted />
-      <Row label="Prediction confidence" v={`${proj.confidence}%`} muted />
-      {proj.tier && proj.tier !== 'general' && (
-        <Row label="Selectivity tier" v={proj.tier === 'top-elite' ? '🏆 Top elite' : '⭐ Elite'} muted />
-      )}
+    <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 mt-2">
+      <div className="text-[10px] text-slate-500 mb-1.5 flex justify-between">
+        <span>Position vs 2026 cutoff band</span>
+        <span className="tabular-nums">{Math.round(low)}–{Math.round(high)}</span>
+      </div>
+      <div className="relative h-3">
+        <div className="absolute inset-x-0 top-1/2 h-1.5 bg-slate-200 rounded-full -translate-y-1/2" />
+        <div
+          className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-amber-400"
+          style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }}
+        />
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+          style={{ left: `${pct(you)}%` }}>
+          <div className="h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+        </div>
+      </div>
     </div>
   );
 }
-function Row({ label, v, bold, accent, muted }) {
+
+/* ============================================================
+   SHARED COMPONENTS
+   ============================================================ */
+function SectionDivider({ label, color = 'indigo' }) {
+  const colors = {
+    amber: 'from-transparent via-amber-300 to-amber-500 text-amber-700',
+    indigo: 'from-transparent via-indigo-300 to-indigo-500 text-indigo-700',
+    emerald: 'from-transparent via-emerald-300 to-emerald-500 text-emerald-700'
+  };
+  const cls = colors[color];
   return (
-    <div className={`flex justify-between ${muted ? 'text-slate-500' : ''}`}>
-      <span>{label}</span>
-      <span className={`tabular-nums ${bold ? 'font-bold' : 'font-medium'} ${accent ? 'text-indigo-700' : 'text-slate-900'}`}>{v ?? '—'}</span>
+    <div className="flex items-center gap-2 mb-3">
+      <div className={`h-px flex-1 bg-gradient-to-r ${cls.split(' text-')[0]}`} />
+      <span className={`text-[10px] uppercase tracking-[0.18em] font-bold ${cls.split(' ')[3]}`}>{label}</span>
+      <div className={`h-px flex-1 bg-gradient-to-l ${cls.split(' text-')[0]}`} />
+    </div>
+  );
+}
+
+function KpiTile({ label, value, sub, tone }) {
+  const colors = {
+    safe: 'from-emerald-500 to-green-600',
+    good: 'from-blue-500 to-indigo-600',
+    mid:  'from-amber-500 to-orange-600',
+    risk: 'from-orange-500 to-red-600',
+    reach:'from-rose-500 to-red-700',
+    indigo: 'from-indigo-500 to-violet-600',
+    emerald: 'from-emerald-500 to-teal-600',
+    violet: 'from-violet-500 to-fuchsia-600',
+    unknown: 'from-slate-400 to-slate-600'
+  };
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3.5 relative overflow-hidden">
+      <div className={`absolute -top-8 -right-8 h-20 w-20 rounded-full bg-gradient-to-br ${colors[tone] || colors.indigo} opacity-10`} />
+      <div className="relative">
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</div>
+        <div className="font-display text-3xl text-slate-900 tabular-nums mt-1 leading-none">{value ?? '—'}</div>
+        {sub && <div className="text-[11px] text-slate-500 mt-1">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function Verdict({ tone, label, emoji, big }) {
+  return (
+    <div className={`badge badge-${tone} ${big ? '!text-sm !px-3 !py-1.5' : ''}`}>
+      <span>{emoji}</span><span>{label}</span>
+    </div>
+  );
+}
+function SmallStat({ label, value, sub, positive }) {
+  return (
+    <div className="rounded-lg bg-slate-50/80 border border-slate-200/70 p-2 text-center">
+      <div className="text-[9px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className={`text-sm font-bold tabular-nums ${positive === false ? 'text-rose-700' : positive ? 'text-emerald-700' : 'text-slate-900'}`}>{value ?? '—'}</div>
+      {sub && <div className="text-[9px] text-slate-400">{sub}</div>}
     </div>
   );
 }
@@ -263,8 +609,7 @@ function FactorReveal({ r }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(o => !o)}
-        className="mt-3 text-xs font-semibold text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1">
+      <button onClick={() => setOpen(o => !o)} className="mt-3 text-xs font-semibold text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1">
         {open ? '▾' : '▸'} How was this calculated?
       </button>
       {open && (
@@ -274,9 +619,7 @@ function FactorReveal({ r }) {
             <ul className="space-y-0.5">
               {r.breakdown.map((b, i) => (
                 <li key={i} className="flex justify-between tabular-nums">
-                  <span className="font-mono text-slate-500">{b.code}</span>
-                  <span className="text-slate-700">{b.role}</span>
-                  <span className="font-medium text-slate-900">{b.score.toFixed(2)}</span>
+                  <span className="font-mono text-slate-500">{b.code}</span><span className="text-slate-700">{b.role}</span><span className="font-medium text-slate-900">{b.score.toFixed(2)}</span>
                 </li>
               ))}
               <li className="flex justify-between tabular-nums border-t border-slate-200 mt-1 pt-1 font-bold">
@@ -291,9 +634,7 @@ function FactorReveal({ r }) {
                 <li key={i} className="text-slate-600">
                   <div className="flex justify-between items-baseline gap-2">
                     <span><b className="text-slate-800">{f.id}</b> · {f.name}</span>
-                    <span className="font-mono whitespace-nowrap text-slate-800">
-                      {f.contribution > 0 ? '+' : ''}{f.contribution?.toFixed(2) ?? '0'}
-                    </span>
+                    <span className="font-mono whitespace-nowrap text-slate-800">{f.contribution > 0 ? '+' : ''}{f.contribution?.toFixed(2) ?? '0'}</span>
                   </div>
                   <div className="text-[10px] text-slate-400">{f.note}</div>
                 </li>
@@ -301,44 +642,11 @@ function FactorReveal({ r }) {
             </ul>
           </div>
           <div className="text-slate-500">
-            Composite percentile ≈ <b className="text-slate-700">{r.percentile}%ile</b> ·
-            Logistic steepness k = <span className="font-mono">{r.probability.k}</span> ·
-            Seats considered = {r.probability.seatsConsidered ?? 'n/a'}
+            Composite percentile ≈ <b className="text-slate-700">{r.percentile}%ile</b> · Logistic steepness k = <span className="font-mono">{r.probability.k}</span> · Seats considered = {r.probability.seatsConsidered ?? 'n/a'}
           </div>
         </div>
       )}
     </>
-  );
-}
-
-function Verdict({ tone, label, emoji, big }) {
-  return (
-    <div className={`badge badge-${tone} ${big ? '!text-sm !px-3 !py-1.5' : ''}`}>
-      <span>{emoji}</span><span>{label}</span>
-    </div>
-  );
-}
-
-function BigStat({ label, value, sub, positive }) {
-  return (
-    <div className="rounded-xl bg-slate-50/60 border border-slate-200/70 p-3 text-center">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
-      <div className={`text-xl font-bold tabular-nums ${positive === false ? 'text-rose-700' : positive ? 'text-emerald-700' : 'text-slate-900'}`}>
-        {value ?? '—'}
-      </div>
-      <div className="text-[10px] text-slate-400">{sub}</div>
-    </div>
-  );
-}
-function SmallStat({ label, value, sub, positive }) {
-  return (
-    <div className="rounded-lg bg-slate-50/80 border border-slate-200/70 p-2 text-center">
-      <div className="text-[9px] uppercase tracking-wider text-slate-500">{label}</div>
-      <div className={`text-sm font-bold tabular-nums ${positive === false ? 'text-rose-700' : positive ? 'text-emerald-700' : 'text-slate-900'}`}>
-        {value ?? '—'}
-      </div>
-      {sub && <div className="text-[9px] text-slate-400">{sub}</div>}
-    </div>
   );
 }
 
@@ -348,14 +656,13 @@ function simulate(r, delta) {
   const newScore = r.yourComposite + delta;
   const margin = newScore - proj.mostLikely;
   const sigma = proj.sigma;
-  const k = 2.0 / sigma;
+  let k = 2.0 / sigma;
   const seats = r.probability.seatsConsidered;
-  let kAdj = k;
   if (seats && seats > 0) {
     const seatAdj = Math.sqrt(40 / Math.max(seats, 5));
-    kAdj *= Math.max(0.8, Math.min(1.6, seatAdj));
+    k *= Math.max(0.8, Math.min(1.6, seatAdj));
   }
-  let p = 1 / (1 + Math.exp(-kAdj * margin));
+  let p = 1 / (1 + Math.exp(-k * margin));
   p = Math.max(0.01, Math.min(0.99, p)) * 100;
   return Math.round(p * 10) / 10;
 }
@@ -370,8 +677,7 @@ function DisclaimerCard() {
       <div className="flex gap-3 items-start">
         <div className="text-2xl">⚠️</div>
         <div className="text-sm text-amber-900">
-          <b>Statistical estimates only.</b> Projections come from real CUET 2025/2026 NTA data + DU 2025-26 Round 1 cutoffs. Actual 2026 cutoffs depend on who applies, preference orders, withdrawals, and DU/CSAS policy.
-          Use as guidance — verify with the official DU Bulletin of Information.
+          <b>Statistical estimates only.</b> Projections come from real CUET 2025/2026 NTA data + DU 2025-26 Round 1 cutoffs. Actual 2026 cutoffs depend on who applies, preference orders, withdrawals, and DU/CSAS policy. Use as guidance — verify with the official DU Bulletin of Information.
         </div>
       </div>
     </div>

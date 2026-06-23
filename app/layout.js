@@ -17,7 +17,7 @@ export default function RootLayout({ children }) {
       <body>
         <div className="relative z-10">
           {/* ============= NAVBAR ============= */}
-          <header className="sticky top-0 z-30">
+          <header className="sticky top-0 z-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
               <nav className="card flex items-center justify-between px-4 sm:px-6 py-3">
                 <a href="/" className="flex items-center gap-2.5 group">
@@ -34,7 +34,6 @@ export default function RootLayout({ children }) {
                 </a>
                 <div className="flex items-center gap-1 sm:gap-2 text-sm">
                   <a href="/" className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Home</a>
-                  <a href="#how" className="hidden sm:inline px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Methodology</a>
                   <a href="/admin" className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Admin</a>
                 </div>
               </nav>

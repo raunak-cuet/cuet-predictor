@@ -63,6 +63,28 @@ body::before {
 }
 
 /* ============================================================
+   DROPDOWN PANEL — escapes the parent card's stacking context
+   ============================================================ */
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0; right: 0;
+  z-index: 50;
+  max-height: 22rem;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.04),
+    0 24px 48px -12px rgba(15, 23, 42, 0.25),
+    0 8px 16px -4px rgba(15, 23, 42, 0.12);
+  /* Force own stacking context above sticky nav and parent card filters */
+  isolation: isolate;
+  will-change: transform;
+}
+
+/* ============================================================
    CARDS
    ============================================================ */
 .card {
@@ -184,6 +206,12 @@ body::before {
 .bar-mid   > div { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 .bar-risk  > div { background: linear-gradient(90deg, #fb923c, #fdba74); }
 .bar-reach > div { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+.tone-safe-text  { color: #047857; }
+.tone-good-text  { color: #1d4ed8; }
+.tone-mid-text   { color: #b45309; }
+.tone-risk-text  { color: #c2410c; }
+.tone-reach-text { color: #991b1b; }
 
 /* ============================================================
    VERDICT BADGES

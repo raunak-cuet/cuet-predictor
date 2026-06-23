@@ -228,12 +228,12 @@ export default function Home() {
               </div>
 
               {showDropdown && subjectsTaken.length > 0 && (
-                <div className="absolute z-30 mt-2 w-full max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5">
+                <div className="dropdown-panel">
                   {/* Search results header */}
-                  <div className="sticky top-0 z-10 px-4 py-2 bg-slate-50/95 backdrop-blur border-b border-slate-100 text-[11px] text-slate-500 font-medium">
+                  <div className="sticky top-0 px-4 py-2.5 bg-slate-100 border-b border-slate-200 text-[11px] text-slate-600 font-semibold uppercase tracking-wider">
                     {searchDream
                       ? `${filteredDreams.length.toLocaleString()} of ${dreamOptions.length.toLocaleString()} programs match`
-                      : `Showing all ${dreamOptions.length.toLocaleString()} eligible programs · scroll or type to search`}
+                      : `${dreamOptions.length.toLocaleString()} eligible programs · scroll or type to search`}
                   </div>
 
                   {filteredDreams.length === 0 ? (
@@ -243,10 +243,10 @@ export default function Home() {
                   ) : (
                     filteredDreams.map(o => (
                       <button key={o.id} type="button" onClick={() => selectDream(o)}
-                        className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-50 last:border-0 transition
+                        className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-100 last:border-0 transition
                           ${String(o.id) === dreamId
                             ? 'bg-indigo-50 text-indigo-900 font-medium'
-                            : 'text-slate-700 hover:bg-slate-50'}`}>
+                            : 'text-slate-800 hover:bg-indigo-50/50'}`}>
                         <div className="truncate">{o.label}</div>
                       </button>
                     ))
