@@ -1,0 +1,350 @@
+[
+ {
+  "college": "Aditi Mahavidyalaya",
+  "program": "Bachelor of Elementary Education (B.El.Ed.)",
+  "seats_entrance": {
+   "total": 63,
+   "UR": 25,
+   "SC": 9,
+   "ST": 5,
+   "OBC": 17,
+   "EWS": 7
+  }
+ },
+ {
+  "college": "Aryabhatta College",
+  "program": "B.A.(Honours) Business Economics",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Aryabhatta College",
+  "program": "Bachelor of Management Studies (BMS)",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "College of Vocational Studies",
+  "program": "B.A.(Hons.) Business Economics",
+  "seats_entrance": {
+   "total": 78,
+   "UR": 31,
+   "SC": 12,
+   "ST": 6,
+   "OBC": 21,
+   "EWS": 8
+  }
+ },
+ {
+  "college": "College of Vocational Studies",
+  "program": "Bachelor of Management Studies",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Cluster Innovation Centre",
+  "program": "B.Tech. (Information Technology & Mathematical Innovations)",
+  "seats_entrance": {
+   "total": 50,
+   "UR": 20,
+   "SC": 7,
+   "ST": 4,
+   "OBC": 14,
+   "EWS": 5
+  }
+ },
+ {
+  "college": "Cluster Innovation Centre",
+  "program": "B.A. Honours (Humanities & Social Sciences)",
+  "seats_entrance": {
+   "total": 50,
+   "UR": 20,
+   "SC": 7,
+   "ST": 4,
+   "OBC": 14,
+   "EWS": 5
+  }
+ },
+ {
+  "college": "Dr. Bhim Rao Ambedkar College",
+  "program": "B A (H) Business Economics",
+  "seats_entrance": {
+   "total": 77,
+   "UR": 31,
+   "SC": 12,
+   "ST": 6,
+   "OBC": 21,
+   "EWS": 7
+  }
+ },
+ {
+  "college": "Deen Dayal Upadhyaya College",
+  "program": "Bachelor of Management Studies (BMS)",
+  "seats_entrance": {
+   "total": 60,
+   "UR": 24,
+   "SC": 9,
+   "ST": 5,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Delhi School of Journalism",
+  "program": "Five Year Integrated Programm in Journalism",
+  "seats_entrance": {
+   "total": 120,
+   "UR": 54,
+   "SC": 16,
+   "ST": 8,
+   "OBC": 30,
+   "EWS": 12
+  }
+ },
+ {
+  "college": "Gargi College",
+  "program": "BA (H) Business Economics",
+  "seats_entrance": {
+   "total": 59,
+   "UR": 24,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Gargi College",
+  "program": "Bachelor of Elementary Education (B.El.Ed.)",
+  "seats_entrance": {
+   "total": 63,
+   "UR": 25,
+   "SC": 9,
+   "ST": 5,
+   "OBC": 17,
+   "EWS": 7
+  }
+ },
+ {
+  "college": "Indira Gandhi Institute of Physical Education and Sports Sciences",
+  "program": "B.Sc. In Physical Education, Health Education and Sports (B.Sc. (PE,HE & S)",
+  "seats_entrance": {
+   "total": 135,
+   "UR": 54,
+   "SC": 20,
+   "ST": 10,
+   "OBC": 36,
+   "EWS": 15
+  }
+ },
+ {
+  "college": "Indraprastha College For Women",
+  "program": "B.A (H) Multi Media and Mass Communication {MMMC)",
+  "seats_entrance": {
+   "total": 65,
+   "UR": 26,
+   "SC": 10,
+   "ST": 5,
+   "OBC": 18,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Indraprastha College For Women",
+  "program": "B.A.(H) MUSIC",
+  "seats_entrance": {
+   "total": 47,
+   "UR": 19,
+   "SC": 7,
+   "ST": 3,
+   "OBC": 13,
+   "EWS": 5
+  }
+ },
+ {
+  "college": "Institute of Home Economics",
+  "program": "Bachelor of Elementary Education (B.El.Ed.)",
+  "seats_entrance": {
+   "total": 62,
+   "UR": 29,
+   "SC": 9,
+   "ST": 5,
+   "OBC": 16,
+   "EWS": 3
+  }
+ },
+ {
+  "college": "Keshav Mahavidyalaya",
+  "program": "Bachelor of Management Studies (BMS)",
+  "seats_entrance": {
+   "total": 59,
+   "UR": 24,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Lady Shri Ram College for Women",
+  "program": "Bachelor of Elementary Education (B.El.Ed.)",
+  "seats_entrance": {
+   "total": 63,
+   "UR": 25,
+   "SC": 9,
+   "ST": 5,
+   "OBC": 17,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Lakshmibai College",
+  "program": "B.A. (Hons.) Business Economics",
+  "seats_entrance": {
+   "total": 38,
+   "UR": 15,
+   "SC": 6,
+   "ST": 3,
+   "OBC": 10,
+   "EWS": 4
+  }
+ },
+ {
+  "college": "Maharaja Agrasen College",
+  "program": "BA (H) Business Economics",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Miranda House",
+  "program": "Bachelor of Elementary Education (B.El.Ed.)",
+  "seats_entrance": {
+   "total": 63,
+   "UR": 26,
+   "SC": 9,
+   "ST": 5,
+   "OBC": 17,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Ram Lal Anand College",
+  "program": "Bachelor of Management Studies (BMS)",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Ramanujan College",
+  "program": "Bachelor of Management Studies (B.M.S.)",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Shaheed Rajguru college of Applied Sciences for Women",
+  "program": "Bachelor in Management studies(BMS)",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Shaheed Rajguru college of Applied Sciences for Women",
+  "program": "Bachelors in Business Administration(Financial Investment Analysis((BBA(BFIA))",
+  "seats_entrance": {
+   "total": 58,
+   "UR": 23,
+   "SC": 9,
+   "ST": 4,
+   "OBC": 16,
+   "EWS": 6
+  }
+ },
+ {
+  "college": "Shaheed Sukhdev College of Business Studies",
+  "program": "Bachelor of Management Studies (BMS)",
+  "seats_entrance": {
+   "total": 232,
+   "UR": 93,
+   "SC": 35,
+   "ST": 17,
+   "OBC": 63,
+   "EWS": 24
+  }
+ },
+ {
+  "college": "Shaheed Sukhdev College of Business Studies",
+  "program": "Bachelor of Business Administration (Financial Investment Analysis)",
+  "seats_entrance": {
+   "total": 113,
+   "UR": 45,
+   "SC": 17,
+   "ST": 8,
+   "OBC": 31,
+   "EWS": 12
+  }
+ },
+ {
+  "college": "Shivaji College",
+  "program": "B.A. (Hons.) Business Economics",
+  "seats_entrance": {
+   "total": 78,
+   "UR": 31,
+   "SC": 12,
+   "ST": 6,
+   "OBC": 21,
+   "EWS": 8
+  }
+ },
+ {
+  "college": "Shyama Prasad Mukherji College for Women",
+  "program": "Bachelor of Elementary Education (B.El.Ed.)",
+  "seats_entrance": {
+   "total": 63,
+   "UR": 26,
+   "SC": 9,
+   "ST": 5,
+   "OBC": 17,
+   "EWS": 6
+  }
+ }
+]
