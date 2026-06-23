@@ -103,14 +103,12 @@ export default function Home() {
           <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-800">
             Now projecting 2026 DU cutoffs
           </span>
-          <span className="text-amber-400">·</span>
-          <span className="text-[11px] font-medium text-amber-700">Updated for CUET 2026</span>
         </div>
-        <h1 className="mt-6 font-display text-5xl sm:text-7xl text-slate-900 leading-[0.95]">
-          Stop guessing your DU rank.<br className="hidden sm:block" />
+        <h1 className="mt-6 font-display text-[2.2rem] leading-[1.08] sm:text-6xl lg:text-7xl sm:leading-[1.0] text-slate-900 max-w-[24ch] sm:max-w-[28ch] mx-auto">
+          Stop guessing your DU rank.{' '}
           <span className="italic relative inline-block">
             Let data science
-            <svg className="absolute -bottom-2 left-0 w-full" height="14" viewBox="0 0 300 14" fill="none">
+            <svg className="absolute -bottom-2 left-0 w-full" height="14" viewBox="0 0 300 14" fill="none" preserveAspectRatio="none">
               <path d="M2 9c50-6 100-6 150 0s100 6 146 0" stroke="url(#g)" strokeWidth="3" strokeLinecap="round" />
               <defs>
                 <linearGradient id="g" x1="0" y1="0" x2="300" y2="0">
@@ -121,12 +119,11 @@ export default function Home() {
           </span>{' '}
           calculate your real odds.
         </h1>
-        <p className="mt-6 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
-          A 12-factor statistical engine that <b className="text-slate-900">projects 2026 cutoffs</b> and your real admission chances across&nbsp;
-          <b className="text-slate-900">1,526 college-program combinations</b> at Delhi University.
+        <p className="mt-6 text-base sm:text-lg text-slate-600 max-w-3xl mx-auto">
+          A 12-factor statistical engine that <b className="text-slate-900">projects 2026 cutoffs</b> and your real admission chances across <b className="text-slate-900">1,526 college-program combinations</b> at Delhi University.
         </p>
-        <div className="mt-7 flex items-center justify-center gap-2 text-xs text-slate-500">
-          <Stat>1,526 programs</Stat>·<Stat>67 colleges</Stat>·<Stat>12-factor engine</Stat>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-slate-500">
+          <Stat>1,526 programs</Stat>·<Stat>67 colleges</Stat>·<Stat>12-factor engine</Stat>·<Stat>all categories</Stat>
         </div>
       </section>
 
@@ -268,8 +265,8 @@ export default function Home() {
         {/* ===== Right column: SIDEBAR ===== */}
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
           <div className="card p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 grid place-items-center text-white text-sm">📊</div>
+            <div className="flex items-center gap-2.5 mb-3">
+              <SidebarIcon><BarsIcon /></SidebarIcon>
               <h3 className="font-semibold text-slate-900">What's in the model</h3>
             </div>
             <ul className="text-[13px] text-slate-700 space-y-2.5">
@@ -283,8 +280,8 @@ export default function Home() {
           </div>
 
           <div id="how" className="card p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 grid place-items-center text-white text-sm">🧮</div>
+            <div className="flex items-center gap-2.5 mb-3">
+              <SidebarIcon><SigmaIcon /></SidebarIcon>
               <h3 className="font-semibold text-slate-900">The math, in plain English</h3>
             </div>
             <ol className="text-[13px] text-slate-700 space-y-2 list-none counter-reset-step">
@@ -375,6 +372,31 @@ function Mi({ n, children }) {
   );
 }
 
+/* Dark slate badge to match the step-number circles in the form */
+function SidebarIcon({ children }) {
+  return (
+    <div className="shrink-0 h-8 w-8 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white grid place-items-center shadow-sm">
+      {children}
+    </div>
+  );
+}
+function BarsIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <line x1="5"  y1="20" x2="5"  y2="14" />
+      <line x1="12" y1="20" x2="12" y2="9"  />
+      <line x1="19" y1="20" x2="19" y2="4"  />
+    </svg>
+  );
+}
+function SigmaIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round">
+      <path d="M17 5H7l6 7-6 7h10" />
+    </svg>
+  );
+}
+
 /* =====================================================================
    CutoffTicker — Grandeur showcase. Announces that the platform covers
    every flagship DU program WITHOUT revealing numeric cutoffs (so
@@ -408,11 +430,10 @@ function CutoffTicker() {
           <span>NEW · CUET 2026</span>
         </div>
         <h2 className="ticker-title">
-          We project the <span className="ticker-grad">Expected 2026 Cutoffs</span><br />
-          for every Delhi University program.
+          We project the <span className="ticker-grad">Expected 2026 Cutoffs</span> for every Delhi University program.
         </h2>
         <p className="ticker-sub">
-          1,526 college-program combinations · all categories · enter your scores below to see yours.
+          Enter your scores below to see yours.
         </p>
       </div>
 

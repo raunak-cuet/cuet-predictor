@@ -273,11 +273,16 @@ body {
 }
 .ticker-title {
   font-family: 'Instrument Serif', Georgia, serif;
-  font-size: clamp(1.7rem, 3vw + 1rem, 2.8rem);
+  font-size: clamp(1.6rem, 2.6vw + 0.9rem, 2.8rem);
   line-height: 1.15;
   color: #f8fafc;
   letter-spacing: -0.01em;
-  margin: 0 0 0.6rem;
+  margin: 0 auto 0.6rem;
+  max-width: 28ch;
+  text-wrap: balance;       /* Modern browsers — distributes lines evenly */
+}
+@supports not (text-wrap: balance) {
+  .ticker-title { max-width: 32ch; }
 }
 .ticker-grad {
   background: linear-gradient(135deg, #fbbf24 0%, #f472b6 50%, #a78bfa 100%);
@@ -388,6 +393,7 @@ body {
 .font-display {
   font-family: 'Instrument Serif', 'Playfair Display', Georgia, serif;
   letter-spacing: -0.02em;
+  text-wrap: balance;     /* evenly distribute lines on supported browsers */
 }
 
 /* ============================================================

@@ -1,8 +1,21 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'CUET 2026 → DU Admission Predictor',
-  description: 'Know your real chances at Delhi University, instantly. Statistically rigorous, fully explainable.'
+  title: 'DreamSeat | CUET 2026 College & Cutoff Predictor',
+  description: 'A statistical engine projecting expected 2026 cutoffs and your real admission chances across every Delhi University college and program.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon-16.png', type: 'image/png', sizes: '16x16' }
+    ],
+    apple: '/apple-touch-icon.png'
+  },
+  openGraph: {
+    title: 'DreamSeat | CUET 2026 College & Cutoff Predictor',
+    description: 'Project expected 2026 cutoffs and your real DU admission chances. 1,526 college-program combinations.',
+    images: ['/stars-icon-rounded.png']
+  }
 };
 export const viewport = { width: 'device-width', initialScale: 1 };
 
@@ -20,16 +33,15 @@ export default function RootLayout({ children }) {
           <header className="sticky top-0 z-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
               <nav className="card flex items-center justify-between px-4 sm:px-6 py-3">
-                <a href="/" className="flex items-center gap-2.5 group">
-                  <div className="relative h-9 w-9 rounded-xl grid place-items-center text-white font-bold text-sm
-                                  bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600
-                                  shadow-[0_4px_12px_-2px_rgba(79,70,229,0.5)]">
-                    DU
-                    <span className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/30 to-transparent" />
-                  </div>
+                <a href="/" className="flex items-center gap-3 group">
+                  <img src="/stars-icon-rounded.png" alt="DreamSeat"
+                       className="h-10 w-10 rounded-[10px] shadow-sm" />
                   <div className="leading-tight">
-                    <div className="font-semibold text-slate-900 text-sm">CUET → DU Predictor</div>
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500">2026 Admissions Cycle</div>
+                    <img src="/dreamseat-wordmark.png" alt="DreamSeat"
+                         className="h-5 sm:h-6 w-auto" />
+                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-0.5">
+                      CUET 2026 College &amp; Cutoff Predictor
+                    </div>
                   </div>
                 </a>
                 <div className="flex items-center gap-1 sm:gap-2 text-sm">
@@ -49,7 +61,7 @@ export default function RootLayout({ children }) {
               <hr className="hr-fade mb-6" />
               <div className="flex flex-col md:flex-row justify-between gap-4 text-xs text-slate-500">
                 <div>
-                  <span className="text-slate-700 font-semibold">CUET → DU Predictor</span>
+                  <span className="text-slate-700 font-semibold">DreamSeat</span>
                   &nbsp;· Built on public NTA CUET 2025/2026 data &amp; DU 2025-26 Round-1 cutoffs.
                 </div>
                 <div className="text-slate-400">
