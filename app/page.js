@@ -104,7 +104,7 @@ export default function Home() {
             Now projecting 2026 DU cutoffs
           </span>
         </div>
-        <h1 className="mt-6 font-display text-[1.7rem] sm:text-4xl md:text-5xl lg:text-[3.5rem] leading-[1.2] sm:leading-[1.1] text-slate-900 mx-auto px-2">
+        <h1 className="mt-6 font-display text-[2rem] sm:text-4xl md:text-5xl lg:text-[3.5rem] leading-[1.18] sm:leading-[1.1] text-slate-900 mx-auto px-2">
           Stop guessing your DU rank.<br />
           <span className="italic">Let{' '}
             <span className="relative inline-block">
@@ -117,7 +117,9 @@ export default function Home() {
                   </linearGradient>
                 </defs>
               </svg>
-            </span>{' '}calculate your real odds.
+            </span>{' '}calculate{/* mobile-only line break before "your real odds." */}
+            <br className="sm:hidden" />{' '}
+            your real odds.
           </span>
         </h1>
         <p className="mt-6 text-[13px] leading-[1.55] sm:text-lg sm:leading-normal text-slate-600 max-w-3xl mx-auto px-3">

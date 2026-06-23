@@ -1,4 +1,5 @@
 import './globals.css';
+import Logo from './components/Logo';
 
 export const metadata = {
   title: 'DreamSeat | CUET 2026 College & Cutoff Predictor',
@@ -35,10 +36,8 @@ export default function RootLayout({ children }) {
               <nav className="card flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
                 <a href="/" className="flex items-center gap-3 group">
                   <div className="leading-tight">
-                    <img src="/dreamseat-wordmark.png" alt="DreamSeat"
-                         className="h-7 sm:h-10 w-auto block shrink-0"
-                         style={{ maxWidth: 'none' }} />
-                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1.5">
+                    <Logo />
+                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1">
                       CUET 2026 College &amp; Cutoff Predictor
                     </div>
                   </div>
