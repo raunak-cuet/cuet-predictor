@@ -1,9 +1,4 @@
-// Admin maintenance mode toggle
-// GET  /api/admin/maintenance?password=...        → returns current state
-// POST /api/admin/maintenance                     → body { password, enabled: boolean }
-//
-// Uses a Supabase tiny `settings` table for state. This way it survives
-// across serverless function instances without needing a separate KV store.
+// Public read-only endpoint: returns whether maintenance is on.
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, configCheck } from '@/lib/supabase';
@@ -13,62 +8,39 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
-const ADMIN = process.env.ADMIN_PASSWORD || 'CUET_ADMIN@#$118';
-const SETTING_KEY = 'maintenance_mode';
-
-async function readState(sb) {
-  const { data, error } = await sb
-    .from('settings')
-    .select('value')
-    .eq('key', SETTING_KEY)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.value === true || data?.value === 'true';
+function noStoreHeaders() {
+  return { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' };
 }
 
-async function writeState(sb, enabled) {
-  const { error } = await sb
-    .from('settings')
-    .upsert({ key: SETTING_KEY, value: enabled }, { onConflict: 'key' });
-  if (error) throw error;
-}
-
-export async function GET(req) {
-  const { searchParams } = new URL(req.url);
-  const password = searchParams.get('password') || '';
-  if (password !== ADMIN) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const cfg = configCheck();
-  if (cfg) return NextResponse.json({ error: cfg }, { status: 500 });
-
-  const sb = supabaseAdmin();
-  try {
-    const enabled = await readState(sb);
-    return NextResponse.json({ ok: true, enabled }, {
-      headers: { 'Cache-Control': 'no-store' }
-    });
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+// Bulletproof truthiness check — accepts every shape Supabase JSONB can hand back
+function isTrue(v) {
+  if (v === true || v === 1)                  return true;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    return s === 'true' || s === '"true"' || s === '1' || s === 'yes' || s === 'on';
   }
+  return false;
 }
 
-export async function POST(req) {
-  let body;
-  try { body = await req.json(); }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-
-  const { password, enabled } = body || {};
-  if (password !== ADMIN) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (typeof enabled !== 'boolean') return NextResponse.json({ error: 'enabled must be boolean' }, { status: 400 });
-
+export async function GET() {
   const cfg = configCheck();
-  if (cfg) return NextResponse.json({ error: cfg }, { status: 500 });
+  if (cfg) return NextResponse.json({ enabled: false, reason: cfg }, { headers: noStoreHeaders() });
 
   const sb = supabaseAdmin();
   try {
-    await writeState(sb, enabled);
-    return NextResponse.json({ ok: true, enabled });
+    const { data, error } = await sb
+      .from('settings')
+      .select('value')
+      .eq('key', 'maintenance_mode')
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ enabled: false, reason: error.message }, { headers: noStoreHeaders() });
+    }
+
+    const enabled = isTrue(data?.value);
+    return NextResponse.json({ enabled, raw: data?.value ?? null }, { headers: noStoreHeaders() });
   } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return NextResponse.json({ enabled: false, reason: e.message }, { headers: noStoreHeaders() });
   }
 }

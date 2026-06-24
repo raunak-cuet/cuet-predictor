@@ -22,6 +22,11 @@ export const metadata = {
 };
 export const viewport = { width: 'device-width', initialScale: 1 };
 
+// Force every page render to be dynamic — bypasses Vercel's edge cache so
+// middleware-driven maintenance routing always works.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

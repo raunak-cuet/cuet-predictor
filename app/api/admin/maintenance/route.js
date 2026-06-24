@@ -1,10 +1,6 @@
 // Admin maintenance mode toggle
 // GET  /api/admin/maintenance?password=...   → returns current state + sets bypass cookie
 // POST /api/admin/maintenance                → body { password, enabled } + refreshes cookie
-//
-// The bypass cookie value IS the admin password. It's HttpOnly + Secure
-// so it can't be stolen by JS or read in plaintext over the wire.
-// This keeps the middleware Edge-Runtime compatible (no Node crypto).
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, configCheck } from '@/lib/supabase';
@@ -34,6 +30,16 @@ function setBypassCookie(res) {
   });
 }
 
+// Accept every JSONB shape Supabase might return
+function isTrue(v) {
+  if (v === true || v === 1) return true;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    return s === 'true' || s === '"true"' || s === '1' || s === 'yes' || s === 'on';
+  }
+  return false;
+}
+
 async function readState(sb) {
   const { data, error } = await sb
     .from('settings')
@@ -41,10 +47,11 @@ async function readState(sb) {
     .eq('key', SETTING_KEY)
     .maybeSingle();
   if (error) throw error;
-  return data?.value === true || data?.value === 'true';
+  return isTrue(data?.value);
 }
 
 async function writeState(sb, enabled) {
+  // Store as a JSON boolean — always normalized so reads are predictable
   const { error } = await sb
     .from('settings')
     .upsert(
@@ -57,8 +64,7 @@ async function writeState(sb, enabled) {
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const password = searchParams.get('password') || '';
-  const ADMIN = getAdminPassword();
-  if (password !== ADMIN) {
+  if (password !== getAdminPassword()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -84,8 +90,7 @@ export async function POST(req) {
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
   const { password, enabled } = body || {};
-  const ADMIN = getAdminPassword();
-  if (password !== ADMIN) {
+  if (password !== getAdminPassword()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   if (typeof enabled !== 'boolean') {
