@@ -1,40 +1,35 @@
 // ============================================================
-// MAINTENANCE MIDDLEWARE
-// Maintenance can be turned on EITHER by:
-//   (a) Setting env var MAINTENANCE_MODE=true in Vercel (emergency)
-//   (b) Flipping the toggle in /admin (preferred — instant, no redeploy)
+// MAINTENANCE MIDDLEWARE — with admin cookie-bypass
 //
-// The admin toggle stores its state in Supabase. To avoid every request
-// hitting Supabase, we use a tiny client-fetched check via cookie that
-// the maintenance API sets. But since middleware runs on the edge and
-// can't easily query Supabase, we use the env var as the primary switch
-// AND let the admin toggle write to env vars via Vercel API... too complex.
+// Behaviour:
+//   • If the request has a valid `ds_bypass` cookie (set when admin
+//     logs in / toggles maintenance), they ALWAYS see the live site
+//     even when maintenance is on.
+//   • Otherwise, if maintenance is enabled (DB toggle OR env var),
+//     the request is rewritten to /maintenance.
+//   • /admin and /api/admin/* always work — even without bypass —
+//     so the admin can always re-enter the dashboard if needed.
 //
-// SIMPLEST RELIABLE APPROACH: cookie-based.
-// When admin toggles maintenance on, the API sets a cookie that the
-// middleware reads. Since cookies are set per-browser, this would only
-// affect the admin. So instead, we use a global pattern:
-// the middleware does a fast fetch to /api/maintenance-status which is
-// cached at the edge for 10 seconds.
+// Maintenance can be enabled by:
+//   (a) Toggling in /admin (preferred — instant, no redeploy)
+//   (b) Setting MAINTENANCE_MODE=true in Vercel (emergency override)
 // ============================================================
 
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 
-// Cache the maintenance-state check in-memory at the edge for 10 seconds
-// to avoid hitting Supabase on every request.
-let cachedState = { enabled: false, fetchedAt: 0 };
+const BYPASS_COOKIE = 'ds_bypass';
 const CACHE_TTL_MS = 10_000;
+let cachedState = { enabled: false, fetchedAt: 0 };
+
+function expectedBypassToken() {
+  const ADMIN = process.env.ADMIN_PASSWORD || 'CUET_ADMIN@#$118';
+  return crypto.createHmac('sha256', ADMIN).update('dreamseat-admin-bypass').digest('hex').slice(0, 32);
+}
 
 async function isMaintenanceOn(request) {
-  // 1. Env var override (fastest, used in true emergencies)
   if (process.env.MAINTENANCE_MODE === 'true') return true;
-
-  // 2. Cached DB state
-  if (Date.now() - cachedState.fetchedAt < CACHE_TTL_MS) {
-    return cachedState.enabled;
-  }
-
-  // 3. Fresh check
+  if (Date.now() - cachedState.fetchedAt < CACHE_TTL_MS) return cachedState.enabled;
   try {
     const url = new URL('/api/maintenance-status', request.url);
     const res = await fetch(url, { cache: 'no-store' });
@@ -50,8 +45,8 @@ async function isMaintenanceOn(request) {
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Always allow these paths — even during maintenance
-  const allowed = [
+  // Always allow these paths regardless of maintenance state
+  const alwaysAllowed = [
     '/maintenance',
     '/admin',
     '/api/admin',
@@ -62,14 +57,20 @@ export async function middleware(request) {
     '/dreamseat-wordmark',
     '/stars-icon'
   ];
-  if (allowed.some(prefix => pathname.startsWith(prefix))) {
+  if (alwaysAllowed.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
   const on = await isMaintenanceOn(request);
   if (!on) return NextResponse.next();
 
-  // Rewrite to /maintenance (URL stays the same to the user)
+  // Maintenance is ON — check for admin bypass cookie
+  const cookie = request.cookies.get(BYPASS_COOKIE)?.value;
+  if (cookie && cookie === expectedBypassToken()) {
+    return NextResponse.next();   // admin bypasses maintenance silently
+  }
+
+  // Regular user — rewrite to /maintenance
   const url = request.nextUrl.clone();
   url.pathname = '/maintenance';
   return NextResponse.rewrite(url);
