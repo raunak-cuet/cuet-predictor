@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { SUBJECT_BY_CODE } from '@/lib/subjects';
 import { SUBJECT_STATS, CATEGORY_POOL } from '@/lib/cuet2026';
@@ -217,14 +217,27 @@ function ScorePositionBar({ r }) {
   const range = dispMax - dispMin;
   const pct = (v) => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
 
+  // Decide which label goes on top vs bottom row to avoid overlap when
+  // student's score is close to the cutoff band.
+  const youX = pct(you);
+  const bandX = pct((low + high) / 2);
+  const labelsOverlap = Math.abs(youX - bandX) < 18;   // less than ~18% apart
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
-      <div className="flex items-baseline justify-between mb-3">
+      <div className="flex items-baseline justify-between mb-2">
         <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">Score positioning vs estimated 2026 cut-off</div>
         <div className="text-[10px] text-slate-400">scale: {dispMin.toFixed(0)} – {dispMax}</div>
       </div>
 
-      <div className="relative h-16">
+      {/* Labels ABOVE the bar — spaced row, two-level stagger if close */}
+      <div className="relative h-8 mt-2">
+        <Tag x={bandX} color="amber" level={labelsOverlap && youX < bandX ? 'high' : 'low'}>est. cut-off range</Tag>
+        <Tag x={youX}  color="emerald" level={labelsOverlap && youX >= bandX ? 'high' : 'low'}>your score</Tag>
+      </div>
+
+      {/* The bar itself */}
+      <div className="relative h-7">
         {/* Track */}
         <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-200 rounded-full -translate-y-1/2" />
         {/* Cut-off band */}
@@ -234,37 +247,40 @@ function ScorePositionBar({ r }) {
           title={`Estimated cutoff band: ${low}–${high}`}
         />
         {/* You marker */}
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(you)}%` }}>
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${youX}%` }}>
           <div className="h-5 w-5 rounded-full bg-emerald-500 ring-4 ring-white shadow-lg" />
         </div>
+      </div>
 
-        {/* Labels above */}
-        <div className="absolute -top-1 left-0 right-0 h-4">
-          <Tag x={pct((low + high) / 2)} color="amber">est. cut-off range</Tag>
-          <Tag x={pct(you)} color="emerald" right>your score ✓</Tag>
-        </div>
-        {/* Labels below */}
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[10px] text-slate-500 font-mono tabular-nums">
-          <span>{dispMin.toFixed(0)}</span>
-          <span>{Math.round(low)}</span>
-          <span>{Math.round(high)}</span>
-          <span>{dispMax}</span>
-        </div>
-        <div className="absolute -bottom-5 left-0 right-0 text-center" style={{ marginLeft: `${pct(you) - 50}%` }}>
-          <span className="text-[11px] font-bold text-emerald-700 tabular-nums">{you?.toFixed(2)}</span>
+      {/* Numeric scale below the bar */}
+      <div className="mt-2 flex justify-between text-[10px] text-slate-500 font-mono tabular-nums">
+        <span>{dispMin.toFixed(0)}</span>
+        <span>{Math.round(low)}</span>
+        <span>{Math.round(high)}</span>
+        <span>{dispMax}</span>
+      </div>
+
+      {/* Your-score numeric value, anchored under the dot */}
+      <div className="relative mt-1 h-4">
+        <div className="absolute -translate-x-1/2" style={{ left: `${youX}%` }}>
+          <span className="text-[11px] font-bold text-emerald-700 tabular-nums whitespace-nowrap">{you?.toFixed(2)}</span>
         </div>
       </div>
     </div>
   );
 }
-function Tag({ x, color, children, right }) {
+function Tag({ x, color, children, level = 'low' }) {
   const colors = {
-    amber: 'text-amber-700 bg-amber-50',
-    emerald: 'text-emerald-700 bg-emerald-50'
+    amber:   'text-amber-700 bg-amber-50 border border-amber-200',
+    emerald: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
   };
+  // Two stagger levels so close-together labels don't overlap horizontally
+  const top = level === 'high' ? 0 : 18;
   return (
-    <div className={`absolute text-[10px] font-semibold px-1.5 py-0.5 rounded ${colors[color]} ${right ? '-translate-x-1/2' : '-translate-x-1/2'}`}
-         style={{ left: `${x}%`, top: '-18px' }}>
+    <div
+      className={`absolute text-[10px] font-semibold px-1.5 py-0.5 rounded -translate-x-1/2 whitespace-nowrap ${colors[color]}`}
+      style={{ left: `${x}%`, top: `${top}px` }}
+    >
       {children}
     </div>
   );
@@ -414,6 +430,7 @@ function AllResults({ results, dreamId }) {
   const [filter, setFilter] = useState('ALL');
   const [sort, setSort] = useState('PROB');
   const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(50);   // render-cap for performance
 
   const items = useMemo(() => {
     let arr = results.filter(r => r.id !== dreamId);
@@ -431,10 +448,19 @@ function AllResults({ results, dreamId }) {
     return arr;
   }, [results, filter, sort, search, dreamId]);
 
+  // Reset pagination whenever filter/sort/search change so the user sees fresh top results
+  useEffect(() => { setVisibleCount(50); }, [filter, sort, search]);
+
+  const displayed = items.slice(0, visibleCount);
+  const hasMore = items.length > visibleCount;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-between gap-3 items-end">
-        <p className="text-sm text-slate-500">{items.length.toLocaleString()} programs · sorted by your admission probability</p>
+        <p className="text-sm text-slate-500">
+          {items.length.toLocaleString()} programs · sorted by your admission probability
+          {hasMore && <span className="text-slate-400"> · showing first {visibleCount}</span>}
+        </p>
         <div className="flex flex-wrap gap-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search college / course…" className="field !py-2 text-sm w-56" />
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="field !py-2 text-sm">
@@ -454,15 +480,28 @@ function AllResults({ results, dreamId }) {
       {items.length === 0 ? (
         <div className="card-solid p-10 text-center text-slate-500">No programs match this filter.</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {items.map((r, i) => <ResultCard key={r.id} r={r} idx={i} />)}
-        </div>
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {displayed.map((r, i) => <ResultCard key={r.id} r={r} idx={i} />)}
+          </div>
+          {hasMore && (
+            <div className="text-center pt-2">
+              <button
+                onClick={() => setVisibleCount(c => c + 50)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 transition-colors shadow-sm"
+              >
+                Show 50 more
+                <span className="text-[11px] text-slate-400 font-mono tabular-nums">({items.length - visibleCount} remaining)</span>
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function ResultCard({ r, idx }) {
+const ResultCard = memo(function ResultCard({ r, idx }) {
   const [whatIf, setWhatIf] = useState(0);
   const p = r.probability.p ?? 0;
   const tone = r.probability.verdict?.tone || 'unknown';
@@ -508,7 +547,7 @@ function ResultCard({ r, idx }) {
       <FactorReveal r={r} />
     </div>
   );
-}
+});
 
 function MiniPositionBar({ r }) {
   const proj = r.projection;
@@ -701,11 +740,11 @@ function simulate(r, delta) {
   const newScore = r.yourComposite + delta;
   const margin = newScore - proj.mostLikely;
   const sigma = proj.sigma;
-  let k = 2.0 / sigma;
+  let k = 1.0 / sigma;
   const seats = r.probability.seatsConsidered;
   if (seats && seats > 0) {
     const seatAdj = Math.sqrt(40 / Math.max(seats, 5));
-    k *= Math.max(0.8, Math.min(1.6, seatAdj));
+    k *= Math.max(0.85, Math.min(1.3, seatAdj));
   }
   let p = 1 / (1 + Math.exp(-k * margin));
   p = Math.max(0.01, Math.min(0.99, p)) * 100;
