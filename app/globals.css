@@ -537,6 +537,20 @@ html { overflow-x: hidden; }
 .chip-on-amber   { background: linear-gradient(135deg, #d97706, #f59e0b); }
 .chip-on-rose    { background: linear-gradient(135deg, #db2777, #f43f5e); }
 
+/* Disabled / blocked state — student already maxed out this category */
+.chip-blocked {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+  background: #f8fafc;
+  color: #94a3b8;
+  border-style: dashed;
+}
+.chip-blocked:hover {
+  border-color: var(--ink-100) !important;
+  background: #f8fafc !important;
+  transform: none;
+}
+
 /* ============================================================
    PROGRESS BAR (no shimmer — was a huge perf cost)
    ============================================================ */

@@ -46,11 +46,79 @@ export default function Home() {
 
   const toggleSubject = (code) => {
     setSubjectsTaken(prev => {
-      const next = prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code];
+      // If already selected → always allow turning OFF
+      if (prev.includes(code)) {
+        setDreamId(''); setDreamLabel(''); setSearchDream('');
+        return prev.filter(c => c !== code);
+      }
+
+      // Trying to ADD — enforce CUET 2026 rules
+      const subj = SUBJECT_BY_CODE[code];
+      if (!subj) return prev;
+
+      const currentLangs   = prev.filter(c => SUBJECT_BY_CODE[c]?.group === 'LANG').length;
+      const currentDomains = prev.filter(c => SUBJECT_BY_CODE[c]?.group === 'DOMAIN').length;
+      const currentGAT     = prev.filter(c => SUBJECT_BY_CODE[c]?.group === 'GAT').length;
+      const total          = prev.length;
+
+      // Hard rule 1: total ≤ 5
+      if (total >= 5) return prev;
+
+      // Group-specific caps
+      if (subj.group === 'LANG'   && currentLangs   >= 2) return prev;
+      if (subj.group === 'GAT'    && currentGAT     >= 1) return prev;
+      if (subj.group === 'DOMAIN') {
+        // 1 language → max 3 domains; 2 languages → max 2 domains
+        const maxDomains = currentLangs >= 2 ? 2 : 3;
+        if (currentDomains >= maxDomains) return prev;
+      }
+
+      // Also enforce: adding a 2nd language while you already have 3 domains
+      // would push total over the budget for the 2-lang track. Block it.
+      if (subj.group === 'LANG' && currentLangs === 1 && currentDomains >= 3) return prev;
+
       setDreamId(''); setDreamLabel(''); setSearchDream('');
-      return next;
+      return [...prev, code];
     });
   };
+
+  // Compute which subjects are currently "blocked" for display (greyed out)
+  const blockedCodes = useMemo(() => {
+    const blocked = new Set();
+    const total = subjectsTaken.length;
+    const currentLangs   = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'LANG').length;
+    const currentDomains = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'DOMAIN').length;
+    const currentGAT     = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'GAT').length;
+
+    for (const s of [...LANGUAGES, ...DOMAINS, ...GAT]) {
+      if (subjectsTaken.includes(s.code)) continue;       // selected items are never "blocked"
+      if (total >= 5)                          { blocked.add(s.code); continue; }
+      if (s.group === 'LANG'   && currentLangs   >= 2) blocked.add(s.code);
+      if (s.group === 'GAT'    && currentGAT     >= 1) blocked.add(s.code);
+      if (s.group === 'DOMAIN') {
+        const maxDomains = currentLangs >= 2 ? 2 : 3;
+        if (currentDomains >= maxDomains) blocked.add(s.code);
+      }
+      if (s.group === 'LANG' && currentLangs === 1 && currentDomains >= 3) blocked.add(s.code);
+    }
+    return blocked;
+  }, [subjectsTaken]);
+
+  // Friendly hint text shown beneath the chips
+  const selectionHint = useMemo(() => {
+    const total = subjectsTaken.length;
+    const langs   = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'LANG').length;
+    const domains = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'DOMAIN').length;
+    const gat     = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'GAT').length;
+    if (total === 0) return null;
+    if (total >= 5)  return 'You\'ve hit the 5-subject CUET limit.';
+    const maxDomains = langs >= 2 ? 2 : 3;
+    const parts = [];
+    if (langs   < 2)            parts.push(`${2 - langs} more language${2-langs===1?'':'s'} allowed`);
+    if (domains < maxDomains)   parts.push(`${maxDomains - domains} more domain${maxDomains-domains===1?'':'s'} allowed`);
+    if (gat === 0)              parts.push('GAT optional');
+    return parts.join(' · ');
+  }, [subjectsTaken]);
   const onScore = (code, val) => {
     if (val === '' || val == null) { const c = { ...scores }; delete c[code]; setScores(c); return; }
     const n = Number(val);
@@ -153,13 +221,18 @@ export default function Home() {
           {/* STEP 1 */}
           <Step n={1} title="Subjects you appeared for" subtitle="Pick only what you actually took. Courses will auto-filter.">
             <div className="space-y-7">
-              <SubjectGroup title="Languages" list={LANGUAGES} selected={subjectsTaken} toggle={toggleSubject} accent="amber" />
-              <SubjectGroup title="Domain Subjects" list={DOMAINS} selected={subjectsTaken} toggle={toggleSubject} accent="emerald" />
-              <SubjectGroup title="General Aptitude" list={GAT} selected={subjectsTaken} toggle={toggleSubject} accent="indigo" />
+              <SubjectGroup title="Languages"        list={LANGUAGES} selected={subjectsTaken} blocked={blockedCodes} toggle={toggleSubject} accent="amber" />
+              <SubjectGroup title="Domain Subjects"  list={DOMAINS}   selected={subjectsTaken} blocked={blockedCodes} toggle={toggleSubject} accent="emerald" />
+              <SubjectGroup title="General Aptitude" list={GAT}       selected={subjectsTaken} blocked={blockedCodes} toggle={toggleSubject} accent="indigo" />
             </div>
             {subjectsTaken.length > 0 && (
-              <div className="mt-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
-                ✓ {subjectsTaken.length} subject{subjectsTaken.length === 1 ? '' : 's'} selected
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+                  ✓ {subjectsTaken.length} of 5 subjects selected
+                </div>
+                {selectionHint && (
+                  <div className="text-xs text-slate-500">{selectionHint}</div>
+                )}
               </div>
             )}
           </Step>
@@ -339,9 +412,9 @@ function Step({ n, title, subtitle, children }) {
   );
 }
 
-function SubjectGroup({ title, list, selected, toggle, accent }) {
+function SubjectGroup({ title, list, selected, blocked, toggle, accent }) {
   const accentClass = { amber: 'chip-on-amber', emerald: 'chip-on-emerald', indigo: 'chip-on-indigo', rose: 'chip-on-rose' }[accent];
-  const accentDot = { amber: 'bg-amber-500', emerald: 'bg-emerald-500', indigo: 'bg-indigo-500', rose: 'bg-rose-500' }[accent];
+  const accentDot   = { amber: 'bg-amber-500',   emerald: 'bg-emerald-500',   indigo: 'bg-indigo-500',   rose: 'bg-rose-500'   }[accent];
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -351,10 +424,16 @@ function SubjectGroup({ title, list, selected, toggle, accent }) {
       </div>
       <div className="flex flex-wrap gap-2.5">
         {list.map(s => {
-          const on = selected.includes(s.code);
+          const on        = selected.includes(s.code);
+          const isBlocked = blocked?.has(s.code);
           return (
-            <button key={s.code} type="button" onClick={() => toggle(s.code)}
-              className={`chip ${on ? `chip-on ${accentClass}` : ''}`}>
+            <button
+              key={s.code} type="button"
+              onClick={() => toggle(s.code)}
+              disabled={isBlocked && !on}
+              title={isBlocked && !on ? 'Selection limit reached — deselect another to pick this' : undefined}
+              className={`chip ${on ? `chip-on ${accentClass}` : ''} ${isBlocked && !on ? 'chip-blocked' : ''}`}
+            >
               <span>{s.name}</span>
             </button>
           );
