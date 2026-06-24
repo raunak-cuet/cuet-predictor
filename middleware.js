@@ -1,35 +1,35 @@
 // ============================================================
-// MAINTENANCE MIDDLEWARE — with admin cookie-bypass
+// MAINTENANCE MIDDLEWARE — Edge-Runtime compatible (no Node modules)
 //
 // Behaviour:
-//   • If the request has a valid `ds_bypass` cookie (set when admin
-//     logs in / toggles maintenance), they ALWAYS see the live site
-//     even when maintenance is on.
-//   • Otherwise, if maintenance is enabled (DB toggle OR env var),
-//     the request is rewritten to /maintenance.
-//   • /admin and /api/admin/* always work — even without bypass —
-//     so the admin can always re-enter the dashboard if needed.
+//   • Maintenance ON (DB toggle or env var) → all visitors see /maintenance
+//   • Admin has a bypass cookie set on login → sees the real site
+//   • /admin and /api/admin/* always accessible
 //
-// Maintenance can be enabled by:
-//   (a) Toggling in /admin (preferred — instant, no redeploy)
-//   (b) Setting MAINTENANCE_MODE=true in Vercel (emergency override)
+// Cookie scheme: HttpOnly + Secure cookie storing the admin password.
+// JS can't read it (HttpOnly), HTTPS encrypts it in transit (Secure).
+// Edge-Runtime safe — no Node crypto required.
 // ============================================================
 
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 
 const BYPASS_COOKIE = 'ds_bypass';
 const CACHE_TTL_MS = 10_000;
+
+// Module-scoped in-memory cache so we don't hit the DB on every request.
+// Cleared every 10s — fresh enough that admin toggle takes effect quickly.
 let cachedState = { enabled: false, fetchedAt: 0 };
 
-function expectedBypassToken() {
-  const ADMIN = process.env.ADMIN_PASSWORD || 'CUET_ADMIN@#$118';
-  return crypto.createHmac('sha256', ADMIN).update('dreamseat-admin-bypass').digest('hex').slice(0, 32);
-}
-
 async function isMaintenanceOn(request) {
+  // 1. Env var override (emergency switch)
   if (process.env.MAINTENANCE_MODE === 'true') return true;
-  if (Date.now() - cachedState.fetchedAt < CACHE_TTL_MS) return cachedState.enabled;
+
+  // 2. Cached state (avoids hammering Supabase)
+  if (Date.now() - cachedState.fetchedAt < CACHE_TTL_MS) {
+    return cachedState.enabled;
+  }
+
+  // 3. Fresh check via internal API
   try {
     const url = new URL('/api/maintenance-status', request.url);
     const res = await fetch(url, { cache: 'no-store' });
@@ -38,14 +38,16 @@ async function isMaintenanceOn(request) {
       cachedState = { enabled: !!j.enabled, fetchedAt: Date.now() };
       return cachedState.enabled;
     }
-  } catch {}
+  } catch {
+    // Fail open — never lock people out due to a DB blip
+  }
   return false;
 }
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Always allow these paths regardless of maintenance state
+  // Always allow these paths — admin can always re-enter even mid-maintenance
   const alwaysAllowed = [
     '/maintenance',
     '/admin',
@@ -65,12 +67,14 @@ export async function middleware(request) {
   if (!on) return NextResponse.next();
 
   // Maintenance is ON — check for admin bypass cookie
+  const ADMIN = process.env.ADMIN_PASSWORD || 'CUET_ADMIN@#$118';
   const cookie = request.cookies.get(BYPASS_COOKIE)?.value;
-  if (cookie && cookie === expectedBypassToken()) {
-    return NextResponse.next();   // admin bypasses maintenance silently
+  if (cookie && cookie === ADMIN) {
+    // Admin gets the live site — silent bypass
+    return NextResponse.next();
   }
 
-  // Regular user — rewrite to /maintenance
+  // Everyone else → rewrite to /maintenance (URL stays the same)
   const url = request.nextUrl.clone();
   url.pathname = '/maintenance';
   return NextResponse.rewrite(url);
