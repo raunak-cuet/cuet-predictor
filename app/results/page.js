@@ -527,7 +527,7 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
       </div>
 
       {/* Compact score-position mini-bar */}
-      <MiniPositionBar r={r} />
+      <MiniPositionBar r={r} simulatedScore={r.yourComposite + whatIf} hasShift={whatIf !== 0} />
 
       <div className="grid grid-cols-3 gap-2 mt-3">
         <SmallStat label="Composite" value={r.yourComposite?.toFixed(2)} sub={`/${r.outOf}`} />
@@ -549,15 +549,20 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
   );
 });
 
-function MiniPositionBar({ r }) {
+function MiniPositionBar({ r, simulatedScore, hasShift }) {
   const proj = r.projection;
-  const you = r.yourComposite;
+  const actualScore = r.yourComposite;
+  // Use simulated score for the moving dot; fall back to actual if not provided
+  const displayScore = typeof simulatedScore === 'number' ? simulatedScore : actualScore;
   const low = proj.conservative;
   const high = proj.aggressive;
-  const dispMin = Math.min(low - 40, you - 40);
-  const dispMax = Math.max(high + 40, you + 40);
+
+  // Scale needs to accommodate slider extremes (−50 to +100), not just current values
+  const dispMin = Math.min(low - 40, actualScore - 60, displayScore - 20);
+  const dispMax = Math.max(high + 40, actualScore + 110, displayScore + 20);
   const range = dispMax - dispMin;
   const pct = v => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
+
   return (
     <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 mt-2">
       <div className="text-[10px] text-slate-500 mb-1.5 flex justify-between">
@@ -565,14 +570,28 @@ function MiniPositionBar({ r }) {
         <span className="tabular-nums">{Math.round(low)}–{Math.round(high)}</span>
       </div>
       <div className="relative h-3">
+        {/* Track */}
         <div className="absolute inset-x-0 top-1/2 h-1.5 bg-slate-200 rounded-full -translate-y-1/2" />
+        {/* Cutoff band */}
         <div
           className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-amber-400"
           style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }}
         />
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
-          style={{ left: `${pct(you)}%` }}>
-          <div className="h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+        {/* Ghost dot at original score (only when shifted) */}
+        {hasShift && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200"
+            style={{ left: `${pct(actualScore)}%` }}
+          >
+            <div className="h-3 w-3 rounded-full bg-emerald-300 ring-2 ring-white opacity-50" />
+          </div>
+        )}
+        {/* Live dot at current (maybe simulated) score */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out"
+          style={{ left: `${pct(displayScore)}%` }}
+        >
+          <div className={`h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white shadow ${hasShift ? 'ring-emerald-200' : ''}`} />
         </div>
       </div>
     </div>

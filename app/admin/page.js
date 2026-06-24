@@ -156,7 +156,13 @@ export default function AdminPage() {
     return (
       <div className="max-w-md mx-auto mt-16 animate-in">
         <div className="card p-8">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 grid place-items-center text-white text-xl mx-auto mb-4">🔐</div>
+          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 grid place-items-center text-white mx-auto mb-4 shadow-sm">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              <circle cx="12" cy="16" r="1.2" fill="currentColor" />
+            </svg>
+          </div>
           <h1 className="font-display text-3xl text-center text-slate-900 mb-1">Owner Dashboard</h1>
           <p className="text-sm text-slate-500 text-center mb-6">Enter the admin password.</p>
           <form onSubmit={login} className="space-y-3">
