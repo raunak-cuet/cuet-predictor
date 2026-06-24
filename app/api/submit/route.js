@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, configCheck } from '@/lib/supabase';
 import { runEngine } from '@/lib/engine';
+import { validateName } from '@/lib/validateName';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
@@ -32,8 +33,9 @@ export async function POST(req) {
   } = body || {};
 
   // ---- Validate input ----
-  if (!name || String(name).trim().length < 2) {
-    return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+  const nameCheck = validateName(name);
+  if (!nameCheck.ok) {
+    return NextResponse.json({ error: nameCheck.reason }, { status: 400 });
   }
   if (!['UR','OBC','SC','ST','EWS','PwBD'].includes(category)) {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 });

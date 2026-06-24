@@ -766,6 +766,21 @@ function simulate(r, delta) {
     k *= Math.max(0.85, Math.min(1.3, seatAdj));
   }
   let p = 1 / (1 + Math.exp(-k * margin));
+
+  // Top-tier rank boost (mirrors server-side logic)
+  if (proj.formulaMax26 && newScore > 0) {
+    const studentPctOfMax = newScore / proj.formulaMax26;
+    if (studentPctOfMax >= 0.90 && margin >= 3) {
+      let eliteFloor;
+      if      (studentPctOfMax >= 0.96) eliteFloor = 0.97;
+      else if (studentPctOfMax >= 0.94) eliteFloor = 0.92;
+      else if (studentPctOfMax >= 0.92) eliteFloor = 0.82;
+      else if (studentPctOfMax >= 0.90) eliteFloor = 0.70;
+      else                              eliteFloor = 0;
+      p = Math.max(p, eliteFloor);
+    }
+  }
+
   p = Math.max(0.01, Math.min(0.99, p)) * 100;
   return Math.round(p * 10) / 10;
 }

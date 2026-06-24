@@ -1,31 +1,61 @@
 // ============================================================
 // MAINTENANCE MIDDLEWARE
-// When MAINTENANCE_MODE=true is set in Vercel env vars, every
-// request to the site is rewritten to /maintenance instead.
+// Maintenance can be turned on EITHER by:
+//   (a) Setting env var MAINTENANCE_MODE=true in Vercel (emergency)
+//   (b) Flipping the toggle in /admin (preferred — instant, no redeploy)
 //
-// To enable:  set MAINTENANCE_MODE=true   in Vercel → Settings → Env Vars → Redeploy
-// To disable: set MAINTENANCE_MODE=false  (or delete the variable) → Redeploy
+// The admin toggle stores its state in Supabase. To avoid every request
+// hitting Supabase, we use a tiny client-fetched check via cookie that
+// the maintenance API sets. But since middleware runs on the edge and
+// can't easily query Supabase, we use the env var as the primary switch
+// AND let the admin toggle write to env vars via Vercel API... too complex.
 //
-// Exemptions (always accessible even during maintenance):
-//   • /admin           — so you can still see submissions
-//   • /api/admin/*     — admin API routes
-//   • /maintenance     — the maintenance page itself
-//   • Static assets    — favicons, images, fonts
+// SIMPLEST RELIABLE APPROACH: cookie-based.
+// When admin toggles maintenance on, the API sets a cookie that the
+// middleware reads. Since cookies are set per-browser, this would only
+// affect the admin. So instead, we use a global pattern:
+// the middleware does a fast fetch to /api/maintenance-status which is
+// cached at the edge for 10 seconds.
 // ============================================================
 
 import { NextResponse } from 'next/server';
 
-export function middleware(request) {
-  const isMaintenance = process.env.MAINTENANCE_MODE === 'true';
-  if (!isMaintenance) return NextResponse.next();
+// Cache the maintenance-state check in-memory at the edge for 10 seconds
+// to avoid hitting Supabase on every request.
+let cachedState = { enabled: false, fetchedAt: 0 };
+const CACHE_TTL_MS = 10_000;
 
+async function isMaintenanceOn(request) {
+  // 1. Env var override (fastest, used in true emergencies)
+  if (process.env.MAINTENANCE_MODE === 'true') return true;
+
+  // 2. Cached DB state
+  if (Date.now() - cachedState.fetchedAt < CACHE_TTL_MS) {
+    return cachedState.enabled;
+  }
+
+  // 3. Fresh check
+  try {
+    const url = new URL('/api/maintenance-status', request.url);
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      const j = await res.json();
+      cachedState = { enabled: !!j.enabled, fetchedAt: Date.now() };
+      return cachedState.enabled;
+    }
+  } catch {}
+  return false;
+}
+
+export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Always allow these paths
+  // Always allow these paths — even during maintenance
   const allowed = [
     '/maintenance',
     '/admin',
     '/api/admin',
+    '/api/maintenance-status',
     '/_next',
     '/favicon',
     '/apple-touch-icon',
@@ -36,16 +66,15 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // Everything else → rewrite to /maintenance
-  // Using rewrite (not redirect) so the URL stays the same to the user.
+  const on = await isMaintenanceOn(request);
+  if (!on) return NextResponse.next();
+
+  // Rewrite to /maintenance (URL stays the same to the user)
   const url = request.nextUrl.clone();
   url.pathname = '/maintenance';
   return NextResponse.rewrite(url);
 }
 
 export const config = {
-  matcher: [
-    // Run middleware on all routes except Next.js internals & static files
-    '/((?!_next/static|_next/image|favicon.ico).*)'
-  ]
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
 };

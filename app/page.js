@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { LANGUAGES, DOMAINS, GAT, SUBJECT_BY_CODE } from '@/lib/subjects';
 import { eligibleProgramsForSubjects } from '@/lib/engine';
+import { validateName } from '@/lib/validateName';
 
 const CATEGORIES = [
   { id: 'UR',   label: 'General',  sub: 'UR'        },
@@ -52,12 +53,21 @@ export default function Home() {
         return prev.filter(c => c !== code);
       }
 
-      // Trying to ADD — enforce CUET 2026 rules
+      // Trying to ADD — enforce CUET 2026 rules per NTA bulletin:
+      //   Max 5 subjects total
+      //   Max 2 languages (List A)
+      //   Max 5 domain subjects (List B) — i.e. no cap below the total cap
+      //   Max 1 GAT
+      //   Valid combinations include:
+      //     • 5 Domain (no language, no GAT)
+      //     • 1 Lang + 4 Domain
+      //     • 1 Lang + 3 Domain + GAT
+      //     • 2 Lang + 3 Domain
+      //     • 2 Lang + 2 Domain + GAT
       const subj = SUBJECT_BY_CODE[code];
       if (!subj) return prev;
 
       const currentLangs   = prev.filter(c => SUBJECT_BY_CODE[c]?.group === 'LANG').length;
-      const currentDomains = prev.filter(c => SUBJECT_BY_CODE[c]?.group === 'DOMAIN').length;
       const currentGAT     = prev.filter(c => SUBJECT_BY_CODE[c]?.group === 'GAT').length;
       const total          = prev.length;
 
@@ -65,17 +75,9 @@ export default function Home() {
       if (total >= 5) return prev;
 
       // Group-specific caps
-      if (subj.group === 'LANG'   && currentLangs   >= 2) return prev;
-      if (subj.group === 'GAT'    && currentGAT     >= 1) return prev;
-      if (subj.group === 'DOMAIN') {
-        // 1 language → max 3 domains; 2 languages → max 2 domains
-        const maxDomains = currentLangs >= 2 ? 2 : 3;
-        if (currentDomains >= maxDomains) return prev;
-      }
-
-      // Also enforce: adding a 2nd language while you already have 3 domains
-      // would push total over the budget for the 2-lang track. Block it.
-      if (subj.group === 'LANG' && currentLangs === 1 && currentDomains >= 3) return prev;
+      if (subj.group === 'LANG' && currentLangs >= 2) return prev;
+      if (subj.group === 'GAT'  && currentGAT   >= 1) return prev;
+      // No domain cap besides the total-5 limit
 
       setDreamId(''); setDreamLabel(''); setSearchDream('');
       return [...prev, code];
@@ -86,20 +88,14 @@ export default function Home() {
   const blockedCodes = useMemo(() => {
     const blocked = new Set();
     const total = subjectsTaken.length;
-    const currentLangs   = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'LANG').length;
-    const currentDomains = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'DOMAIN').length;
-    const currentGAT     = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'GAT').length;
+    const currentLangs = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'LANG').length;
+    const currentGAT   = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'GAT').length;
 
     for (const s of [...LANGUAGES, ...DOMAINS, ...GAT]) {
-      if (subjectsTaken.includes(s.code)) continue;       // selected items are never "blocked"
-      if (total >= 5)                          { blocked.add(s.code); continue; }
-      if (s.group === 'LANG'   && currentLangs   >= 2) blocked.add(s.code);
-      if (s.group === 'GAT'    && currentGAT     >= 1) blocked.add(s.code);
-      if (s.group === 'DOMAIN') {
-        const maxDomains = currentLangs >= 2 ? 2 : 3;
-        if (currentDomains >= maxDomains) blocked.add(s.code);
-      }
-      if (s.group === 'LANG' && currentLangs === 1 && currentDomains >= 3) blocked.add(s.code);
+      if (subjectsTaken.includes(s.code)) continue;
+      if (total >= 5)                                  { blocked.add(s.code); continue; }
+      if (s.group === 'LANG' && currentLangs >= 2)     { blocked.add(s.code); }
+      if (s.group === 'GAT'  && currentGAT   >= 1)     { blocked.add(s.code); }
     }
     return blocked;
   }, [subjectsTaken]);
@@ -112,11 +108,11 @@ export default function Home() {
     const gat     = subjectsTaken.filter(c => SUBJECT_BY_CODE[c]?.group === 'GAT').length;
     if (total === 0) return null;
     if (total >= 5)  return 'You\'ve hit the 5-subject CUET limit.';
-    const maxDomains = langs >= 2 ? 2 : 3;
     const parts = [];
-    if (langs   < 2)            parts.push(`${2 - langs} more language${2-langs===1?'':'s'} allowed`);
-    if (domains < maxDomains)   parts.push(`${maxDomains - domains} more domain${maxDomains-domains===1?'':'s'} allowed`);
-    if (gat === 0)              parts.push('GAT optional');
+    const remaining = 5 - total;
+    parts.push(`${remaining} more subject${remaining === 1 ? '' : 's'} allowed`);
+    if (langs < 2)  parts.push(`${2 - langs} more language${2 - langs === 1 ? '' : 's'}`);
+    if (gat === 0)  parts.push('GAT optional');
     return parts.join(' · ');
   }, [subjectsTaken]);
   const onScore = (code, val) => {
@@ -132,11 +128,12 @@ export default function Home() {
   const clearDream = () => { setDreamId(''); setDreamLabel(''); setSearchDream(''); };
 
   const allScoresValid = subjectsTaken.every(c => typeof scores[c] === 'number');
-  const canSubmit = name.trim().length >= 2 && subjectsTaken.length >= 1 && allScoresValid;
+  const nameCheck = useMemo(() => validateName(name), [name]);
+  const canSubmit = nameCheck.ok && subjectsTaken.length >= 1 && allScoresValid;
 
   async function submit() {
     setErr('');
-    if (name.trim().length < 2)    { setErr('Please enter your name to continue.'); return; }
+    if (!nameCheck.ok)             { setErr(nameCheck.reason || 'Please enter your real name'); return; }
     if (subjectsTaken.length < 1)  { setErr('Please select at least one subject you appeared for.'); return; }
     if (!allScoresValid)           { setErr('Please enter a valid score (0–250) for every selected subject.'); return; }
     setBusy(true);
@@ -288,14 +285,17 @@ export default function Home() {
           </Step>
 
           {/* STEP 4 */}
-          <Step n={4} title={<>Your name <span className="text-rose-500">*</span></>} subtitle="Required. Personalises the results card.">
+          <Step n={4} title={<>Your name <span className="text-rose-500">*</span></>} subtitle="Used only to personalise your results — please use your real name 🙂">
             <input type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Aarav Sharma"
-              className={`field ${name.trim().length >= 2 ? 'field-ok' : ''}`} />
+              autoComplete="name"
+              className={`field ${nameCheck.ok ? 'field-ok' : (name.trim().length > 0 ? 'field-err' : '')}`} />
             <div className="mt-1.5 text-xs">
-              {name.trim().length >= 2
+              {nameCheck.ok
                 ? <span className="text-emerald-700">✓ Looks good, {name.trim().split(' ')[0]}.</span>
-                : <span className="text-slate-400">At least 2 characters.</span>}
+                : (name.trim().length > 0
+                    ? <span className="text-rose-600">{nameCheck.reason}</span>
+                    : <span className="text-slate-400">Enter your full first &amp; last name.</span>)}
             </div>
           </Step>
 
@@ -343,7 +343,7 @@ export default function Home() {
 
           {!canSubmit && (
             <div className="text-center text-xs text-slate-500 -mt-2 space-x-2">
-              {name.trim().length < 2 && <span>· Enter your name</span>}
+              {!nameCheck.ok && <span>· Enter your real name</span>}
               {subjectsTaken.length === 0 && <span>· Pick subjects</span>}
               {subjectsTaken.length > 0 && !allScoresValid && <span>· Fill all scores</span>}
             </div>

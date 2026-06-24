@@ -29,6 +29,42 @@ export default function AdminPage() {
 
   const REFRESH_INTERVAL_SEC = 30;
 
+  // Maintenance toggle state
+  const [maintenance, setMaintenance] = useState(null);   // null = loading, true/false otherwise
+  const [maintBusy, setMaintBusy] = useState(false);
+
+  async function loadMaintenance() {
+    try {
+      const r = await fetch(`/api/admin/maintenance?password=${encodeURIComponent(pwd)}&_t=${Date.now()}`, { cache: 'no-store' });
+      const j = await r.json();
+      if (r.ok) setMaintenance(!!j.enabled);
+    } catch {}
+  }
+  async function toggleMaintenance(next) {
+    if (maintBusy) return;
+    const confirmMsg = next
+      ? 'Turn ON maintenance mode? All visitors will see a "we\'ll be right back" page until you turn it off.'
+      : 'Turn OFF maintenance mode? The site will go live for all visitors immediately.';
+    if (!window.confirm(confirmMsg)) return;
+    setMaintBusy(true);
+    try {
+      const r = await fetch('/api/admin/maintenance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd, enabled: next })
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        alert('Failed: ' + (j.error || 'unknown'));
+      } else {
+        setMaintenance(j.enabled);
+      }
+    } catch (e) {
+      alert('Network error: ' + (e.message || e));
+    }
+    setMaintBusy(false);
+  }
+
   // -------- AUTH --------
   async function login(e) {
     e?.preventDefault();
@@ -50,6 +86,8 @@ export default function AdminPage() {
       setLastRefreshAt(new Date());
       setAuth(true);
       sessionStorage.setItem('cuet:admin', pwd);
+      // Fetch maintenance state right after login
+      loadMaintenance();
     } catch {
       setErr('Network error');
     }
@@ -259,6 +297,22 @@ export default function AdminPage() {
             </svg>
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
+
+          {/* Maintenance toggle */}
+          {maintenance !== null && (
+            <button
+              onClick={() => toggleMaintenance(!maintenance)}
+              disabled={maintBusy}
+              title={maintenance ? 'Site is currently in maintenance mode' : 'Site is live'}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50
+                ${maintenance
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${maintenance ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+              {maintBusy ? 'Updating…' : maintenance ? 'Maintenance ON — turn off' : 'Site live — turn ON maintenance'}
+            </button>
+          )}
 
           {/* Delete all */}
           <button

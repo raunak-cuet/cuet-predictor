@@ -45,6 +45,15 @@ create table public.outcomes (
 );
 
 -- ============================================================
+-- TABLE: settings (key-value store for app-wide flags)
+-- ============================================================
+create table if not exists public.settings (
+  key   text primary key,
+  value jsonb,
+  updated_at timestamptz not null default now()
+);
+
+-- ============================================================
 -- ROW-LEVEL SECURITY
 -- Because every database operation in our app goes through a
 -- server-side API route that uses the SECRET KEY (which bypasses
@@ -55,6 +64,7 @@ create table public.outcomes (
 -- ============================================================
 alter table public.submissions enable row level security;
 alter table public.outcomes    enable row level security;
+alter table public.settings    enable row level security;
 
 -- ============================================================
 -- Verify
