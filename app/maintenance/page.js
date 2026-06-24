@@ -32,12 +32,11 @@ export default function MaintenancePage() {
 
         <p className="mt-5 text-base text-slate-600 leading-relaxed max-w-md mx-auto">
           Thank you for the incredible response — you&rsquo;ve helped us spot a few bugs.
-          We&rsquo;re shipping fixes <b className="text-slate-900">right now</b> and will be back online in approximately
-          {' '}<b className="text-slate-900">2 hours</b>.
+          We are currently working on the maintenance of this website and will be back online soon.
         </p>
 
         <p className="mt-3 text-sm text-slate-500">
-          Your predictions, scores, and existing data are all safe. Please check back shortly.
+          Your predictions, scores, and existing data are all safe.
         </p>
 
         <div className="mt-8 text-[11px] text-slate-400 tracking-wide">

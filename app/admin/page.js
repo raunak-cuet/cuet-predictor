@@ -166,8 +166,9 @@ export default function AdminPage() {
 
     let intervalId;
     const tick = () => {
-      if (document.hidden) return;          // pause when tab not visible
-      if (confirmDel || selected) return;   // pause when a modal is open
+      // Keep ticking even when tab is hidden — admin wants live data
+      // regardless. We still pause if a modal is open to avoid disrupting it.
+      if (confirmDel || selected) return;
       setCountdown(c => {
         if (c <= 1) {
           refresh();
@@ -201,21 +202,40 @@ export default function AdminPage() {
 
   // -------- CSV EXPORT --------
   function downloadCSV() {
-    const allCodes = Array.from(new Set(entries.flatMap(e => Object.keys(e.scores || {})))).sort();
-    const baseHeaders = ['created_at', 'name', 'category', 'dream_label', 'composite_top', 'dream_probability'];
-    const subjectHeaders = allCodes.map(c => `${c}_${(SUBJECT_BY_CODE[c]?.name || c).replace(/[^\w]/g, '').slice(0, 12)}`);
-    const headers = [...baseHeaders, ...subjectHeaders];
+    // Clean, structured CSV — same columns as the table on screen.
+    // Subject-wise scores are intentionally NOT spread across columns;
+    // open any student row in the dashboard for the in-depth breakdown.
+    const headers = [
+      'Date', 'Name', 'Category', 'Dream College',
+      'Composite Score', 'Dream Probability (%)', 'Subjects Taken'
+    ];
+
+    const esc = (v) => {
+      const s = (v ?? '').toString().replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+
     const rows = view.map(e => {
-      const base = baseHeaders.map(h => {
-        const v = e[h];
-        const s = (v ?? '').toString().replace(/"/g, '""');
-        return /[",\n]/.test(s) ? `"${s}"` : s;
+      const date = new Date(e.created_at).toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
       });
-      const subs = allCodes.map(c => (e.scores?.[c] ?? '').toString());
-      return [...base, ...subs].join(',');
+      const subjectsCount = Array.isArray(e.subjects_taken)
+        ? e.subjects_taken.length
+        : Object.keys(e.scores || {}).length;
+      return [
+        esc(date),
+        esc(e.name || 'anonymous'),
+        esc(e.category),
+        esc(e.dream_label || '—'),
+        esc(e.composite_top?.toFixed(2) ?? ''),
+        esc(e.dream_probability ?? ''),
+        esc(`${subjectsCount} subjects`)
+      ].join(',');
     });
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n'); // BOM for Excel UTF-8
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -298,22 +318,6 @@ export default function AdminPage() {
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
 
-          {/* Maintenance toggle */}
-          {maintenance !== null && (
-            <button
-              onClick={() => toggleMaintenance(!maintenance)}
-              disabled={maintBusy}
-              title={maintenance ? 'Site is currently in maintenance mode' : 'Site is live'}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50
-                ${maintenance
-                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'}`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${maintenance ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-              {maintBusy ? 'Updating…' : maintenance ? 'Maintenance ON — turn off' : 'Site live — turn ON maintenance'}
-            </button>
-          )}
-
           {/* Delete all */}
           <button
             onClick={() => setConfirmDel({ kind: 'all' })}
@@ -329,6 +333,46 @@ export default function AdminPage() {
       {lastRefreshAt && (
         <div className="text-[10px] text-slate-400 -mt-3">
           Last refreshed at {lastRefreshAt.toLocaleTimeString('en-IN')}
+        </div>
+      )}
+
+      {/* ============= MAINTENANCE HERO BLOCK ============= */}
+      {maintenance !== null && (
+        <div className={`card-solid p-5 sm:p-6 border-2 ${maintenance ? 'border-rose-300' : 'border-emerald-300'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className={`shrink-0 h-10 w-10 rounded-xl grid place-items-center text-white shadow-sm ${maintenance ? 'bg-gradient-to-br from-rose-500 to-rose-700' : 'bg-gradient-to-br from-emerald-500 to-emerald-700'}`}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-slate-500">Site status</div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`h-2 w-2 rounded-full ${maintenance ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500 animate-pulse'}`} />
+                  <span className={`font-bold text-base sm:text-lg ${maintenance ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {maintenance ? 'DOWN — visitors see maintenance page' : 'LIVE — site is publicly accessible'}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {maintenance
+                    ? 'You can still browse the live site (admin bypass cookie).'
+                    : 'Submissions are being accepted normally.'}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => toggleMaintenance(!maintenance)}
+              disabled={maintBusy}
+              className={`shrink-0 px-5 sm:px-6 py-3 rounded-xl text-sm font-bold text-white uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                ${maintenance
+                  ? 'bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 shadow-[0_8px_20px_-6px_rgba(16,185,129,0.5)]'
+                  : 'bg-gradient-to-br from-rose-500 to-rose-700 hover:from-rose-600 hover:to-rose-800 shadow-[0_8px_20px_-6px_rgba(244,63,94,0.5)]'}`}
+            >
+              {maintBusy ? 'Updating…' : 'Toggle Maintenance Mode'}
+            </button>
+          </div>
         </div>
       )}
 
