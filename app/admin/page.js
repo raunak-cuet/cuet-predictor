@@ -17,9 +17,17 @@ export default function AdminPage() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('DATE');
 
-  const [selected, setSelected] = useState(null);     // entry shown in detail modal
-  const [confirmDel, setConfirmDel] = useState(null); // {kind:'one'|'all', id?, name?}
+  const [selected, setSelected] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRefreshAt, setLastRefreshAt] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+
+  const REFRESH_INTERVAL_SEC = 30;
 
   // -------- AUTH --------
   async function login(e) {
@@ -39,6 +47,7 @@ export default function AdminPage() {
       }
       setSummary(j.summary);
       setEntries(j.entries || []);
+      setLastRefreshAt(new Date());
       setAuth(true);
       sessionStorage.setItem('cuet:admin', pwd);
     } catch {
@@ -48,6 +57,7 @@ export default function AdminPage() {
   }
 
   async function refresh() {
+    setRefreshing(true);
     try {
       // Cache bust: append a unique timestamp + tell fetch to bypass HTTP cache
       const r = await fetch(
@@ -58,8 +68,11 @@ export default function AdminPage() {
       if (r.ok) {
         setSummary(j.summary);
         setEntries(j.entries || []);
+        setLastRefreshAt(new Date());
       }
     } catch {}
+    setRefreshing(false);
+    setCountdown(REFRESH_INTERVAL_SEC);
   }
 
   // -------- DELETE --------
@@ -106,6 +119,28 @@ export default function AdminPage() {
     const cached = sessionStorage.getItem('cuet:admin');
     if (cached) setPwd(cached);
   }, []);
+
+  // -------- AUTO-REFRESH TIMER --------
+  // Ticks the countdown every second. Triggers refresh() at 0.
+  // Pauses entirely when tab is hidden, when a modal is open, or when toggle is off.
+  useEffect(() => {
+    if (!auth || !autoRefresh) return;
+
+    let intervalId;
+    const tick = () => {
+      if (document.hidden) return;          // pause when tab not visible
+      if (confirmDel || selected) return;   // pause when a modal is open
+      setCountdown(c => {
+        if (c <= 1) {
+          refresh();
+          return REFRESH_INTERVAL_SEC;
+        }
+        return c - 1;
+      });
+    };
+    intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, [auth, autoRefresh, confirmDel, selected]);
 
   // -------- TABLE VIEW --------
   const view = useMemo(() => {
@@ -190,14 +225,58 @@ export default function AdminPage() {
           <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-semibold">Internal</div>
           <h1 className="font-display text-4xl text-slate-900">Owner Dashboard</h1>
         </div>
-        <button
-          onClick={() => setConfirmDel({ kind: 'all' })}
-          disabled={entries.length === 0}
-          className="px-3 py-2 rounded-lg text-sm font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          🗑 Delete all entries
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Auto-refresh status pill */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-600">
+            <span className={`h-1.5 w-1.5 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+            {autoRefresh ? (
+              <span>Auto-refresh in <span className="tabular-nums font-semibold text-slate-900">{countdown}s</span></span>
+            ) : (
+              <span>Auto-refresh paused</span>
+            )}
+            <button
+              onClick={() => setAutoRefresh(v => !v)}
+              className="ml-1 text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold uppercase tracking-wider"
+            >
+              {autoRefresh ? 'Pause' : 'Resume'}
+            </button>
+          </div>
+
+          {/* Manual refresh */}
+          <button
+            onClick={() => refresh()}
+            disabled={refreshing}
+            title="Refresh entries from the database"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 disabled:opacity-50"
+          >
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+              className={refreshing ? 'animate-spin' : ''}
+            >
+              <path d="M21 12a9 9 0 1 1-3-6.7" />
+              <polyline points="21 3 21 9 15 9" />
+            </svg>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+
+          {/* Delete all */}
+          <button
+            onClick={() => setConfirmDel({ kind: 'all' })}
+            disabled={entries.length === 0}
+            className="px-3 py-2 rounded-lg text-sm font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            🗑 Delete all entries
+          </button>
+        </div>
       </div>
+
+      {/* Last refresh timestamp — small, subtle */}
+      {lastRefreshAt && (
+        <div className="text-[10px] text-slate-400 -mt-3">
+          Last refreshed at {lastRefreshAt.toLocaleTimeString('en-IN')}
+        </div>
+      )}
 
       {/* KPI tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
