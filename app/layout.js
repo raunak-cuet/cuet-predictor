@@ -1,5 +1,7 @@
 import './globals.css';
 import Logo from './components/Logo';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata = {
   title: 'DreamSeat | CUET 2026 College & Cutoff Predictor',
@@ -33,18 +35,19 @@ export default function RootLayout({ children }) {
           {/* ============= NAVBAR ============= */}
           <header className="sticky top-0 z-20">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
-              <nav className="card flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
+              <nav className="card flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-4">
                 <a href="/" className="flex items-center gap-3 group">
                   <div className="leading-tight">
                     <Logo />
-                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1">
+                    {/* Subtitle hidden on mobile to keep navbar a clean single row */}
+                    <div className="hidden sm:block text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1">
                       CUET 2026 College &amp; Cutoff Predictor
                     </div>
                   </div>
                 </a>
                 <div className="flex items-center gap-1 sm:gap-2 text-sm">
-                  <a href="/" className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Home</a>
-                  <a href="/admin" className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Admin</a>
+                  <a href="/" className="px-2.5 py-1.5 sm:px-3 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Home</a>
+                  <a href="/admin" className="px-2.5 py-1.5 sm:px-3 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Admin</a>
                 </div>
               </nav>
             </div>
@@ -69,6 +72,8 @@ export default function RootLayout({ children }) {
             </div>
           </footer>
         </div>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
