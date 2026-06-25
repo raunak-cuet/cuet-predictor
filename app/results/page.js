@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useRef, memo } from 'react';
+import { useEffect, useMemo, useState, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { SUBJECT_BY_CODE } from '@/lib/subjects';
 import { SUBJECT_STATS, CATEGORY_POOL } from '@/lib/cuet2026';
@@ -486,16 +486,6 @@ function AllResults({ results, dreamId }) {
     return [...types].sort();
   }, [results]);
 
-  // Course filter autocomplete state
-  const [courseSearchOpen, setCourseSearchOpen] = useState(false);
-  const [courseSearchInput, setCourseSearchInput] = useState('');
-
-  const filteredCourseTypes = useMemo(() => {
-    if (!courseSearchInput.trim()) return courseTypes;
-    const q = courseSearchInput.trim().toLowerCase();
-    return courseTypes.filter(c => c.toLowerCase().includes(q));
-  }, [courseTypes, courseSearchInput]);
-
   const items = useMemo(() => {
     let arr = results.filter(r => r.id !== dreamId);
     if (filter === 'SAFE')  arr = arr.filter(r => (r.probability.p ?? 0) >= 75);
@@ -511,7 +501,7 @@ function AllResults({ results, dreamId }) {
     if (sort === 'NAME')  arr.sort((a, b) => (a.college + a.program).localeCompare(b.college + b.program));
     if (sort === 'SCORE') arr.sort((a, b) => (b.yourComposite ?? 0) - (a.yourComposite ?? 0));
     return arr;
-  }, [results, filter, sort, search, dreamId, courseFilter]);
+  }, [results, filter, sort, search, dreamId]);
 
   // Reset pagination whenever filter/sort/search change so the user sees fresh top results
   useEffect(() => { setVisibleCount(50); }, [filter, sort, search, courseFilter]);
@@ -528,16 +518,13 @@ function AllResults({ results, dreamId }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search college / course…" className="field !py-2 text-sm w-56" />
-          <CourseFilterDropdown
-            courseTypes={courseTypes}
-            courseFilter={courseFilter}
-            setCourseFilter={setCourseFilter}
-            search={courseSearchInput}
-            setSearch={setCourseSearchInput}
-            open={courseSearchOpen}
-            setOpen={setCourseSearchOpen}
-            filtered={filteredCourseTypes}
-          />
+          <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="field !py-2 text-sm">
+            <option value="ALL">All courses</option>
+            {courseTypes.slice(0, 50).map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+            {courseTypes.length > 50 && <option disabled>+ {courseTypes.length - 50} more — use search</option>}
+          </select>
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="field !py-2 text-sm">
             <option value="ALL">All chances</option>
             <option value="SAFE">🟢 Safe (≥75%)</option>
@@ -1061,88 +1048,6 @@ function ImportantDisclaimer() {
         </p>
       </div>
     </section>
-  );
-}
-
-/* ============================================================
-   COURSE FILTER DROPDOWN — searchable, like college search
-   ============================================================ */
-function CourseFilterDropdown({ courseTypes, courseFilter, setCourseFilter, search, setSearch, open, setOpen, filtered }) {
-  const ref = useRef(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  const selectCourse = (c) => {
-    setCourseFilter(c);
-    setSearch(c === 'ALL' ? '' : c);
-    setOpen(false);
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => { setOpen(!open); if (!open) setSearch(courseFilter === 'ALL' ? '' : courseFilter); }}
-        className="field !py-2 text-sm min-w-[140px] flex items-center justify-between gap-1"
-      >
-        <span className="truncate">
-          {courseFilter === 'ALL' ? 'All courses' : courseFilter}
-        </span>
-        <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-1 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-          {/* Search input */}
-          <div className="p-2 border-b border-slate-100">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Type to filter courses..."
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
-              autoFocus
-            />
-          </div>
-
-          {/* Course list */}
-          <div className="max-h-64 overflow-y-auto">
-            <button
-              onClick={() => selectCourse('ALL')}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors ${
-                courseFilter === 'ALL' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'
-              }`}
-            >
-              All courses
-            </button>
-            {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-slate-400 text-center">No courses found</div>
-            ) : (
-              filtered.map(c => (
-                <button
-                  key={c}
-                  onClick={() => selectCourse(c)}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors truncate ${
-                    courseFilter === c ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'
-                  }`}
-                >
-                  {c}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
