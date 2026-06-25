@@ -358,11 +358,10 @@ export default function Home() {
               <h3 className="font-semibold text-slate-900">What's in the model</h3>
             </div>
             <ul className="text-[13px] text-slate-700 space-y-2.5">
-              <Li>1,526 DU 2025-26 Round 1 cutoffs across all 67 colleges</Li>
+              <Li>1,526 DU 2025-26 cutoffs across all 67 colleges</Li>
               <Li>NTA 2025 + 2026 subject-wise max-score data</Li>
               <Li>Category-pool growth (UR/OBC/SC/ST/EWS/PwBD)</Li>
               <Li>Top-end density (100%-ile holders ↑20% YoY)</Li>
-              <Li>Structural changes (e.g. <b>BFIA +1 domain in 2026</b>)</Li>
               <Li>Seat scarcity premium for tiny UR/EWS pools</Li>
             </ul>
           </div>
