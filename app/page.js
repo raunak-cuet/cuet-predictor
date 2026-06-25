@@ -537,6 +537,24 @@ function CutoffTicker() {
         </p>
       </div>
 
+      {/* Feature highlights above the scrolling ticker */}
+      <div className="flex flex-wrap justify-center gap-2.5 sm:gap-3 px-4 mb-5 sm:mb-6">
+        {[
+          '+ Real admission probability',
+          '+ Projected 2026 cutoffs',
+          '+ Your exact AIR per subject',
+          '+ Ranked list of every DU college you\'re eligible for'
+        ].map(feature => (
+          <span
+            key={feature}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-[12px] sm:text-[13px] text-slate-200 font-medium backdrop-blur-sm"
+          >
+            <span className="text-amber-400">{feature.charAt(0)}</span>
+            <span>{feature.slice(2)}</span>
+          </span>
+        ))}
+      </div>
+
       <div className="ticker-viewport">
         <div className="ticker-track">
           {[...items, ...items].map((it, i) => (
