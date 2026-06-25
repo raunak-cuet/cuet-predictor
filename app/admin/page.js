@@ -202,17 +202,10 @@ export default function AdminPage() {
 
   // -------- CSV EXPORT --------
   function downloadCSV() {
-    // All 38 possible subject codes for column headers
-    const ALL_SUBJECTS = [
-      '101','102','103','104','105','106','107','108','109','110','111','112','113',
-      '301','302','303','304','305','306','307','308','309','312','313','314','315','316','318','319','320','321','322','323','324','325','326',
-      '501'
-    ];
-
+    // Clean, structured CSV — scores in one summary column.
     const headers = [
       'Date', 'Name', 'Category', 'Dream College',
-      'Composite Score', 'Dream Probability (%)', 'Subjects Taken',
-      ...ALL_SUBJECTS.map(c => `${c} (${SUBJECT_BY_CODE[c]?.name || c})`)
+      'Composite Score', 'Dream Probability (%)', 'Subjects Taken', 'Scores'
     ];
 
     const esc = (v) => {
@@ -229,6 +222,9 @@ export default function AdminPage() {
       const subjectsCount = Array.isArray(e.subjects_taken)
         ? e.subjects_taken.length
         : Object.keys(scores).length;
+      const scoresSummary = Object.entries(scores)
+        .map(([code, val]) => `${code}: ${val}`)
+        .join(', ');
       return [
         esc(date),
         esc(e.name || 'anonymous'),
@@ -237,7 +233,7 @@ export default function AdminPage() {
         esc(e.composite_top?.toFixed(2) ?? ''),
         esc(e.dream_probability ?? ''),
         esc(`${subjectsCount} subjects`),
-        ...ALL_SUBJECTS.map(c => esc(scores[c] ?? ''))
+        esc(scoresSummary)
       ].join(',');
     });
 

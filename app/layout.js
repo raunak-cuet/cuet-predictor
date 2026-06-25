@@ -1,5 +1,6 @@
 import './globals.css';
 import Logo from './components/Logo';
+import UpdateNotice from './components/UpdateNotice';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -36,6 +37,7 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
       </head>
       <body>
+        <UpdateNotice />
         <div className="relative z-10">
           {/* ============= NAVBAR ============= */}
           <header className="sticky top-0 z-20">
@@ -44,8 +46,7 @@ export default function RootLayout({ children }) {
                 <a href="/" className="flex items-center gap-3 group">
                   <div className="leading-tight">
                     <Logo />
-                    {/* Subtitle hidden on mobile to keep navbar a clean single row */}
-                    <div className="hidden sm:block text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-1">
+                    <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-0.5 sm:mt-1">
                       CUET 2026 College &amp; Cutoff Predictor
                     </div>
                   </div>

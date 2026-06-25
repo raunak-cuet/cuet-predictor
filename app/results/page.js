@@ -150,12 +150,20 @@ function SubjectCard({ item }) {
    DREAM REPORT — full visual report (like Claude's example)
    ============================================================ */
 function DreamReport({ r, category }) {
+  const [whatIf, setWhatIf] = useState(0);
   const p = r.probability.p ?? 0;
   const tone = r.probability.verdict?.tone || 'unknown';
   const proj = r.projection;
   const catLabel = { UR: 'General (Unreserved)', OBC: 'OBC-NCL', SC: 'SC', ST: 'ST', EWS: 'EWS', PwBD: 'PwBD' }[category];
   const urSeats = r.seats?.[category] ?? r.seats;
   const showSeats = typeof urSeats === 'number';
+
+  // Dynamic what-if label
+  const deltaLabel = whatIf === 0
+    ? null
+    : whatIf > 0
+      ? `What if I had ${whatIf} more marks?`
+      : `What if I had ${Math.abs(whatIf)} fewer marks?`;
 
   return (
     <div className="card-solid p-6 sm:p-8 ring-2 ring-amber-300 shadow-[0_24px_60px_-20px_rgba(245,158,11,0.35)]">
@@ -179,8 +187,32 @@ function DreamReport({ r, category }) {
         <KpiTile label="Admission probability" value={`~${Math.round(p)}%`} sub={r.probability.verdict?.label} tone={tone} />
       </div>
 
-      {/* SCORE POSITIONING vs CUT-OFF RANGE — Claude-style visual */}
-      <ScorePositionBar r={r} />
+      {/* SCORE POSITIONING vs CUT-OFF RANGE — with what-if support */}
+      <ScorePositionBar r={r} whatIf={whatIf} />
+
+      {/* What-if slider — right below the positioning bar */}
+      <div className="mt-3">
+        <div className="flex justify-between items-center text-sm mb-1.5">
+          <span className="font-semibold text-indigo-900">
+            {deltaLabel || 'Drag to explore what-if scenarios'}
+          </span>
+          {whatIf !== 0 && (
+            <span className="font-mono tabular-nums text-indigo-700">
+              → <b>{simulate(r, whatIf) == null ? '—' : `${simulate(r, whatIf)}%`}</b>
+            </span>
+          )}
+        </div>
+        <input
+          type="range" min="-50" max="100" step="1" value={whatIf}
+          onChange={(e) => setWhatIf(Number(e.target.value))}
+          className="w-full"
+        />
+        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+          <span>−50 marks</span>
+          <span className={whatIf === 0 ? 'font-semibold text-slate-600' : ''}>0</span>
+          <span>+100 marks</span>
+        </div>
+      </div>
 
       {/* Two-column: bars + percentiles */}
       <div className="grid lg:grid-cols-2 gap-4 mt-4">
@@ -190,9 +222,6 @@ function DreamReport({ r, category }) {
 
       {/* Big verdict block */}
       <BigVerdictBlock r={r} category={catLabel} showSeats={showSeats} urSeats={urSeats} />
-
-      {/* What-If slider for dream college */}
-      <DreamWhatIf r={r} />
 
       {/* Key uncertainties */}
       <UncertaintyNote r={r} />
@@ -206,25 +235,26 @@ function DreamReport({ r, category }) {
 /* ============================================================
    Score positioning bar
    ============================================================ */
-function ScorePositionBar({ r }) {
+function ScorePositionBar({ r, whatIf = 0 }) {
   const proj = r.projection;
   const outOf = r.outOf;
   const low = proj.conservative;
   const high = proj.aggressive;
   const mid = proj.mostLikely;
   const you = r.yourComposite;
+  const displayScore = you + whatIf;
+  const hasShift = whatIf !== 0;
 
-  // Display range 700..outOf (focus on top end where things matter)
-  const dispMin = Math.min(700, you - 60, low - 60);
-  const dispMax = outOf;
+  // Display range — accommodate slider extremes
+  const dispMin = Math.min(700, you - 60, low - 60, displayScore - 20);
+  const dispMax = Math.max(outOf, displayScore + 20);
   const range = dispMax - dispMin;
   const pct = (v) => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
 
-  // Decide which label goes on top vs bottom row to avoid overlap when
-  // student's score is close to the cutoff band.
-  const youX = pct(you);
+  // Decide which label goes on top vs bottom row to avoid overlap
+  const youX = pct(displayScore);
   const bandX = pct((low + high) / 2);
-  const labelsOverlap = Math.abs(youX - bandX) < 18;   // less than ~18% apart
+  const labelsOverlap = Math.abs(youX - bandX) < 18;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
@@ -233,10 +263,12 @@ function ScorePositionBar({ r }) {
         <div className="text-[10px] text-slate-400">scale: {dispMin.toFixed(0)} – {dispMax}</div>
       </div>
 
-      {/* Labels ABOVE the bar — spaced row, two-level stagger if close */}
+      {/* Labels ABOVE the bar */}
       <div className="relative h-8 mt-2">
         <Tag x={bandX} color="amber" level={labelsOverlap && youX < bandX ? 'high' : 'low'}>est. cut-off range</Tag>
-        <Tag x={youX}  color="emerald" level={labelsOverlap && youX >= bandX ? 'high' : 'low'}>your score</Tag>
+        <Tag x={youX}  color={hasShift ? 'indigo' : 'emerald'} level={labelsOverlap && youX >= bandX ? 'high' : 'low'}>
+          {hasShift ? `${you + whatIf >= you ? '+' : ''}${whatIf} adjusted` : 'your score'}
+        </Tag>
       </div>
 
       {/* The bar itself */}
@@ -249,9 +281,15 @@ function ScorePositionBar({ r }) {
           style={{ left: `${pct(low)}%`, width: `${Math.max(2, pct(high) - pct(low))}%` }}
           title={`Estimated cutoff band: ${low}–${high}`}
         />
-        {/* You marker */}
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${youX}%` }}>
-          <div className="h-5 w-5 rounded-full bg-emerald-500 ring-4 ring-white shadow-lg" />
+        {/* Ghost dot at original score (only when shifted) */}
+        {hasShift && (
+          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(you)}%` }}>
+            <div className="h-4 w-4 rounded-full bg-emerald-300 ring-2 ring-white opacity-40" />
+          </div>
+        )}
+        {/* Live dot at current (maybe simulated) score */}
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out" style={{ left: `${youX}%` }}>
+          <div className={`h-5 w-5 rounded-full ${hasShift ? 'bg-indigo-500 ring-indigo-200' : 'bg-emerald-500'} ring-4 ring-white shadow-lg`} />
         </div>
       </div>
 
@@ -266,7 +304,9 @@ function ScorePositionBar({ r }) {
       {/* Your-score numeric value, anchored under the dot */}
       <div className="relative mt-1 h-4">
         <div className="absolute -translate-x-1/2" style={{ left: `${youX}%` }}>
-          <span className="text-[11px] font-bold text-emerald-700 tabular-nums whitespace-nowrap">{you?.toFixed(2)}</span>
+          <span className={`text-[11px] font-bold tabular-nums whitespace-nowrap ${hasShift ? 'text-indigo-700' : 'text-emerald-700'}`}>
+            {(you + whatIf)?.toFixed(2)}
+          </span>
         </div>
       </div>
     </div>
@@ -275,7 +315,8 @@ function ScorePositionBar({ r }) {
 function Tag({ x, color, children, level = 'low' }) {
   const colors = {
     amber:   'text-amber-700 bg-amber-50 border border-amber-200',
-    emerald: 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+    emerald: 'text-emerald-700 bg-emerald-50 border border-emerald-200',
+    indigo:  'text-indigo-700 bg-indigo-50 border border-indigo-200'
   };
   // Two stagger levels so close-together labels don't overlap horizontally
   const top = level === 'high' ? 0 : 18;
@@ -393,34 +434,6 @@ function BigVerdictBlock({ r, category, showSeats, urSeats }) {
         estimated probability of securing {showSeats ? `1 of the ${urSeats} ${category}` : 'a'} seat
       </div>
       <div className="text-xs opacity-75 mt-0.5">at {r.college} — {r.program}</div>
-    </div>
-  );
-}
-
-/* ============================================================
-   DREAM WHAT-IF SLIDER
-   ============================================================ */
-function DreamWhatIf({ r }) {
-  const [whatIf, setWhatIf] = useState(0);
-  const simP = simulate(r, whatIf);
-
-  return (
-    <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
-      <div className="flex justify-between items-center text-sm mb-2">
-        <span className="font-semibold text-indigo-900">What-if scenario</span>
-        <span className="font-mono tabular-nums text-indigo-700">
-          {whatIf >= 0 ? '+' : ''}{whatIf} marks → <b>{simP == null ? '—' : `${simP}%`}</b>
-        </span>
-      </div>
-      <input
-        type="range" min="-50" max="100" step="1" value={whatIf}
-        onChange={(e) => setWhatIf(Number(e.target.value))}
-        className="w-full"
-      />
-      <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-        <span>−50 marks</span>
-        <span>+100 marks</span>
-      </div>
     </div>
   );
 }
