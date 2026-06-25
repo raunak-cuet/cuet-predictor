@@ -362,6 +362,7 @@ export default function Home() {
               <Li>NTA 2025 + 2026 subject-wise max-score data</Li>
               <Li>Category-pool growth (UR/OBC/SC/ST/EWS/PwBD)</Li>
               <Li>Top-end density (100%-ile holders ↑20% YoY)</Li>
+              <Li>Structural changes</Li>
               <Li>Seat scarcity premium for tiny UR/EWS pools</Li>
             </ul>
           </div>
