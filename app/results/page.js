@@ -182,7 +182,7 @@ function DreamReport({ r, category }) {
       {/* 4-stat KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <KpiTile label="Composite score" value={r.yourComposite?.toFixed(2)} sub={`out of ${r.outOf}`} tone="emerald" />
-        <KpiTile label="Est. 2026 cut-off" value={`${Math.round(proj.conservative)}–${Math.round(proj.aggressive)}`} sub={`out of ${r.outOf}`} tone="indigo" />
+        <KpiTile label="Est. 2026 cut-off" value={proj.mostLikely != null ? Math.round(proj.mostLikely) : null} sub={proj.mostLikely != null ? `±${Math.round(proj.sigma)} · range ${Math.round(proj.conservative)}–${Math.round(proj.aggressive)}` : `out of ${r.outOf}`} tone="indigo" />
         <KpiTile label={`${category} seats`} value={showSeats ? urSeats : '—'} sub={showSeats ? 'this category' : 'merit-based'} tone="violet" />
         <KpiTile label="Admission probability" value={`~${Math.round(p)}%`} sub={r.probability.verdict?.label} tone={tone} />
       </div>
@@ -281,6 +281,13 @@ function ScorePositionBar({ r, whatIf = 0 }) {
           style={{ left: `${pct(low)}%`, width: `${Math.max(2, pct(high) - pct(low))}%` }}
           title={`Estimated cutoff band: ${low}–${high}`}
         />
+        {/* Range-end ticks on the cutoff band */}
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(low)}%`, height: '18px' }}>
+          <div className="w-0.5 h-full bg-amber-700 rounded-full" />
+        </div>
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(high)}%`, height: '18px' }}>
+          <div className="w-0.5 h-full bg-amber-700 rounded-full" />
+        </div>
         {/* Ghost dot at original score (only when shifted) */}
         {hasShift && (
           <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(you)}%` }}>
@@ -293,12 +300,12 @@ function ScorePositionBar({ r, whatIf = 0 }) {
         </div>
       </div>
 
-      {/* Numeric scale below the bar */}
-      <div className="mt-2 flex justify-between text-[10px] text-slate-500 font-mono tabular-nums">
-        <span>{dispMin.toFixed(0)}</span>
-        <span>{Math.round(low)}</span>
-        <span>{Math.round(high)}</span>
-        <span>{dispMax}</span>
+      {/* Numeric scale below the bar — aligned with actual positions */}
+      <div className="relative mt-2 h-4 text-[10px] font-mono tabular-nums">
+        <span className="absolute left-0 text-slate-400">{dispMin.toFixed(0)}</span>
+        <span className="absolute -translate-x-1/2 text-amber-700 font-semibold" style={{ left: `${pct(low)}%` }}>{Math.round(low)}</span>
+        <span className="absolute -translate-x-1/2 text-amber-700 font-semibold" style={{ left: `${pct(high)}%` }}>{Math.round(high)}</span>
+        <span className="absolute right-0 text-slate-400">{dispMax}</span>
       </div>
 
       {/* Your-score numeric value, anchored under the dot */}
@@ -468,6 +475,64 @@ function UncertaintyNote({ r }) {
 }
 
 /* ============================================================
+   FILTER HELPERS
+   ============================================================ */
+
+// Normalize text for flexible keyword matching.
+function normalizeSearch(str) {
+  return (str || '')
+    .toLowerCase()
+    .replace(/[.,()\[\]\/\\&+\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Collapse single-letter abbreviations like "b a" → "ba" so that
+// "ba economics" matches "B.A. (Hons.) Economics".
+function abbreviate(str) {
+  return str.replace(/\b([a-z])\s+(?=[a-z]\b)/g, '$1');
+}
+
+function relevanceScore(r, q, tokens) {
+  const college = normalizeSearch(r.college);
+  const program = normalizeSearch(r.program);
+
+  const abbrCollege = abbreviate(college);
+  const abbrProgram = abbreviate(program);
+  const haystack = college + ' ' + program;
+  const abbrHaystack = abbrCollege + ' ' + abbrProgram;
+
+  let score = 0;
+
+  // 1. Exact / prefix match bonuses
+  if (college === q || abbrCollege === q) score += 1000;
+  else if (program === q || abbrProgram === q) score += 900;
+  else if (college.startsWith(q + ' ') || abbrCollege.startsWith(q + ' ')) score += 800;
+  else if (college.startsWith(q) || abbrCollege.startsWith(q)) score += 700;
+  else if (program.startsWith(q + ' ') || abbrProgram.startsWith(q + ' ')) score += 650;
+  else if (program.startsWith(q) || abbrProgram.startsWith(q)) score += 600;
+
+  // 2. All tokens present
+  const allInFull = tokens.every(t => haystack.includes(t));
+  const allInAbbr = tokens.every(t => abbrHaystack.includes(t));
+  if (allInFull || allInAbbr) score += 400;
+
+  // 3. Token-level bonuses (weight by length to avoid single-letter spam)
+  tokens.forEach(t => {
+    const w = Math.min(t.length, 4);
+    if (college.includes(t) || abbrCollege.includes(t)) score += 10 * w;
+    if (program.includes(t) || abbrProgram.includes(t)) score += 6 * w;
+  });
+
+  // 4. Prefer shorter, more precise matches
+  if (allInFull || allInAbbr) {
+    score -= (college.length + program.length) * 0.02;
+  }
+
+  return score;
+}
+
+/* ============================================================
    ALL RESULTS LIST
    ============================================================ */
 function AllResults({ results, dreamId }) {
@@ -476,6 +541,17 @@ function AllResults({ results, dreamId }) {
   const [search, setSearch] = useState('');
   const [courseFilter, setCourseFilter] = useState('ALL');
   const [visibleCount, setVisibleCount] = useState(50);   // render-cap for performance
+
+  // When the user starts searching, switch from Probability to Best Match
+  // so the top result is the closest text match (e.g. "shri ram college"
+  // puts SRCC above Lady Shri Ram). Restore Probability when cleared.
+  useEffect(() => {
+    if (search.trim() && sort === 'PROB') {
+      setSort('BEST');
+    } else if (!search.trim() && sort === 'BEST') {
+      setSort('PROB');
+    }
+  }, [search, sort]);
 
   // Extract unique course types from results
   const courseTypes = useMemo(() => {
@@ -492,16 +568,21 @@ function AllResults({ results, dreamId }) {
     if (filter === 'MID')   arr = arr.filter(r => { const p = r.probability.p ?? -1; return p >= 50 && p < 75; });
     if (filter === 'RISKY') arr = arr.filter(r => (r.probability.p ?? 0) < 50);
     if (courseFilter !== 'ALL') arr = arr.filter(r => r.program === courseFilter);
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      arr = arr.filter(r => (r.college + ' ' + r.program).toLowerCase().includes(q));
-    }
-    arr = [...arr];
-    if (sort === 'PROB')  arr.sort((a, b) => (b.probability.p ?? -1) - (a.probability.p ?? -1));
-    if (sort === 'NAME')  arr.sort((a, b) => (a.college + a.program).localeCompare(b.college + b.program));
-    if (sort === 'SCORE') arr.sort((a, b) => (b.yourComposite ?? 0) - (a.yourComposite ?? 0));
-    return arr;
-  }, [results, filter, sort, search, dreamId]);
+
+    const q = normalizeSearch(search);
+    const tokens = q ? q.split(/\s+/).filter(t => t.length > 0) : [];
+
+    let scored = arr.map(r => ({ r, score: tokens.length ? relevanceScore(r, q, tokens) : 0 }));
+    if (tokens.length) scored = scored.filter(x => x.score > 0);
+
+    scored = [...scored];
+    if (sort === 'PROB')  scored.sort((a, b) => (b.r.probability.p ?? -1) - (a.r.probability.p ?? -1));
+    if (sort === 'NAME')  scored.sort((a, b) => (a.r.college + a.r.program).localeCompare(b.r.college + b.r.program));
+    if (sort === 'SCORE') scored.sort((a, b) => (b.r.yourComposite ?? 0) - (a.r.yourComposite ?? 0));
+    if (sort === 'BEST')  scored.sort((a, b) => b.score - a.score || (b.r.probability.p ?? -1) - (a.r.probability.p ?? -1));
+
+    return scored.map(x => x.r);
+  }, [results, filter, sort, search, dreamId, courseFilter]);
 
   // Reset pagination whenever filter/sort/search change so the user sees fresh top results
   useEffect(() => { setVisibleCount(50); }, [filter, sort, search, courseFilter]);
@@ -509,30 +590,42 @@ function AllResults({ results, dreamId }) {
   const displayed = items.slice(0, visibleCount);
   const hasMore = items.length > visibleCount;
 
+  const sortLabel = {
+    PROB: 'sorted by your admission probability',
+    BEST: 'sorted by best match',
+    NAME: 'sorted by name',
+    SCORE: 'sorted by composite score'
+  }[sort] || 'sorted by your admission probability';
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap justify-between gap-3 items-end">
+      <div className="space-y-3">
         <p className="text-sm text-slate-500">
-          {items.length.toLocaleString()} programs · sorted by your admission probability
+          {items.length.toLocaleString()} programs · {sortLabel}
           {hasMore && <span className="text-slate-400"> · showing first {visibleCount}</span>}
         </p>
-        <div className="flex flex-wrap gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search college / course…" className="field !py-2 text-sm w-56" />
-          <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="field !py-2 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search college / course…"
+            className="field !py-2 text-sm w-full"
+          />
+          <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="field !py-2 text-sm w-full">
             <option value="ALL">All courses</option>
-            {courseTypes.slice(0, 50).map(c => (
+            {courseTypes.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
-            {courseTypes.length > 50 && <option disabled>+ {courseTypes.length - 50} more — use search</option>}
           </select>
-          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="field !py-2 text-sm">
+          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="field !py-2 text-sm w-full">
             <option value="ALL">All chances</option>
             <option value="SAFE">🟢 Safe (≥75%)</option>
             <option value="MID">🟡 Moderate (50–75%)</option>
             <option value="RISKY">🔴 Risky (&lt;50%)</option>
           </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} className="field !py-2 text-sm">
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className="field !py-2 text-sm w-full">
             <option value="PROB">Sort: Probability</option>
+            <option value="BEST">Sort: Best Match</option>
             <option value="NAME">Sort: Name</option>
             <option value="SCORE">Sort: Composite</option>
           </select>
@@ -639,6 +732,13 @@ function MiniPositionBar({ r, simulatedScore, hasShift }) {
           className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-amber-400"
           style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }}
         />
+        {/* Range-end ticks */}
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(low)}%`, height: '12px' }}>
+          <div className="w-0.5 h-full bg-amber-600 rounded-full" />
+        </div>
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(high)}%`, height: '12px' }}>
+          <div className="w-0.5 h-full bg-amber-600 rounded-full" />
+        </div>
         {/* Ghost dot at original score (only when shifted) */}
         {hasShift && (
           <div
