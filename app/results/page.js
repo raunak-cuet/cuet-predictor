@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState, memo } from 'react';
+import { useEffect, useMemo, useState, memo, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { SUBJECT_BY_CODE } from '@/lib/subjects';
 import { SUBJECT_STATS, CATEGORY_POOL } from '@/lib/cuet2026';
@@ -475,23 +476,57 @@ function AllResults({ results, dreamId }) {
   const [sort, setSort] = useState('PROB');
   const [search, setSearch] = useState('');
   const [courseFilter, setCourseFilter] = useState('ALL');
+  const [courseSearch, setCourseSearch] = useState('');
+  const [showCourseDropdown, setShowCourseDropdown] = useState(false);
   const [visibleCount, setVisibleCount] = useState(50);   // render-cap for performance
 
-  // Extract unique course types from results
-  const courseTypes = useMemo(() => {
-    const types = new Set();
+  const courseOptions = useMemo(() => {
+    const counts = new Map();
     for (const r of results) {
-      if (r.program) types.add(r.program);
+      if (r.program) counts.set(r.program, (counts.get(r.program) || 0) + 1);
     }
-    return [...types].sort();
+    return [...counts.entries()]
+      .map(([label, count]) => ({ label, count, searchKey: normalizeForSearch(label) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [results]);
+
+  const filteredCourseOptions = useMemo(() => {
+    const q = normalizeForSearch(courseSearch);
+    if (!q) return courseOptions;
+    const tokens = q.split(/\s+/).filter(Boolean);
+    return courseOptions.filter(opt => tokens.every(t => opt.searchKey.includes(t)));
+  }, [courseSearch, courseOptions]);
+
+  const displayedCourseOptions = useMemo(() => filteredCourseOptions.slice(0, 80), [filteredCourseOptions]);
+
+  const selectCourse = (label) => {
+    setCourseFilter(label);
+    setCourseSearch(label);
+    setShowCourseDropdown(false);
+  };
+
+  const clearCourseFilter = () => {
+    setCourseFilter('ALL');
+    setCourseSearch('');
+    setShowCourseDropdown(false);
+  };
 
   const items = useMemo(() => {
     let arr = results.filter(r => r.id !== dreamId);
     if (filter === 'SAFE')  arr = arr.filter(r => (r.probability.p ?? 0) >= 75);
     if (filter === 'MID')   arr = arr.filter(r => { const p = r.probability.p ?? -1; return p >= 50 && p < 75; });
     if (filter === 'RISKY') arr = arr.filter(r => (r.probability.p ?? 0) < 50);
-    if (courseFilter !== 'ALL') arr = arr.filter(r => r.program === courseFilter);
+    if (courseFilter !== 'ALL') {
+      arr = arr.filter(r => r.program === courseFilter);
+    } else {
+      const tokens = normalizeForSearch(courseSearch).split(/\s+/).filter(Boolean);
+      if (tokens.length) {
+        arr = arr.filter(r => {
+          const hay = normalizeForSearch(r.program || '');
+          return tokens.every(t => hay.includes(t));
+        });
+      }
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       arr = arr.filter(r => (r.college + ' ' + r.program).toLowerCase().includes(q));
@@ -501,10 +536,10 @@ function AllResults({ results, dreamId }) {
     if (sort === 'NAME')  arr.sort((a, b) => (a.college + a.program).localeCompare(b.college + b.program));
     if (sort === 'SCORE') arr.sort((a, b) => (b.yourComposite ?? 0) - (a.yourComposite ?? 0));
     return arr;
-  }, [results, filter, sort, search, dreamId]);
+  }, [results, filter, sort, search, courseFilter, courseSearch, dreamId]);
 
   // Reset pagination whenever filter/sort/search change so the user sees fresh top results
-  useEffect(() => { setVisibleCount(50); }, [filter, sort, search, courseFilter]);
+  useEffect(() => { setVisibleCount(50); }, [filter, sort, search, courseFilter, courseSearch]);
 
   const displayed = items.slice(0, visibleCount);
   const hasMore = items.length > visibleCount;
@@ -518,13 +553,19 @@ function AllResults({ results, dreamId }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search college / course…" className="field !py-2 text-sm w-56" />
-          <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="field !py-2 text-sm">
-            <option value="ALL">All courses</option>
-            {courseTypes.slice(0, 50).map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-            {courseTypes.length > 50 && <option disabled>+ {courseTypes.length - 50} more — use search</option>}
-          </select>
+          <SearchableCourseFilter
+            courseOptions={courseOptions}
+            filteredCourseOptions={filteredCourseOptions}
+            displayedCourseOptions={displayedCourseOptions}
+            courseFilter={courseFilter}
+            setCourseFilter={setCourseFilter}
+            courseSearch={courseSearch}
+            setCourseSearch={setCourseSearch}
+            showDropdown={showCourseDropdown}
+            setShowDropdown={setShowCourseDropdown}
+            selectCourse={selectCourse}
+            clearCourseFilter={clearCourseFilter}
+          />
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="field !py-2 text-sm">
             <option value="ALL">All chances</option>
             <option value="SAFE">🟢 Safe (≥75%)</option>
@@ -558,6 +599,145 @@ function AllResults({ results, dreamId }) {
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+function SearchableCourseFilter({
+  courseOptions, filteredCourseOptions, displayedCourseOptions,
+  courseFilter, setCourseFilter,
+  courseSearch, setCourseSearch,
+  showDropdown, setShowDropdown,
+  selectCourse, clearCourseFilter
+}) {
+  const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0, openUp: false });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useLayoutEffect(() => {
+    if (!showDropdown || !inputRef.current) return;
+    function position() {
+      const rect = inputRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const panelH = 360;
+      const openUp = spaceBelow < 220 && rect.top > panelH;
+      setCoords({
+        top: openUp ? rect.top + window.scrollY - 8 : rect.bottom + window.scrollY + 6,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+        openUp
+      });
+    }
+    position();
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [showDropdown]);
+
+  useEffect(() => {
+    function onClick(e) {
+      if (!wrapperRef.current) return;
+      const insideInput = wrapperRef.current.contains(e.target);
+      const insidePanel = e.target.closest?.('.dropdown-portal');
+      if (!insideInput && !insidePanel) setShowDropdown(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [setShowDropdown]);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={courseSearch}
+        onFocus={() => setShowDropdown(true)}
+        onChange={(e) => {
+          const value = e.target.value;
+          setCourseSearch(value);
+          setShowDropdown(true);
+          if (!value || value !== courseFilter) setCourseFilter('ALL');
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && displayedCourseOptions[0]) {
+            e.preventDefault();
+            selectCourse(displayedCourseOptions[0].label);
+          }
+        }}
+        placeholder="Filter course e.g. BA Hons Economics, B.Com Hons…"
+        className="field !py-2 text-sm w-72 pr-10"
+      />
+      {courseSearch && (
+        <button
+          type="button"
+          onClick={clearCourseFilter}
+          className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 grid place-items-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs"
+          aria-label="Clear course filter"
+        >
+          ×
+        </button>
+      )}
+
+      {mounted && showDropdown && createPortal(
+        <div
+          className="dropdown-portal"
+          style={{
+            top: coords.openUp ? coords.top - 360 : coords.top,
+            left: coords.left,
+            width: coords.width
+          }}
+        >
+          <div className="sticky top-0 px-4 py-2.5 bg-slate-100 border-b border-slate-200 text-[11px] text-slate-600 font-semibold uppercase tracking-wider z-10">
+            {courseSearch.trim()
+              ? `${filteredCourseOptions.length.toLocaleString()} of ${courseOptions.length.toLocaleString()} courses match · showing first ${Math.min(80, filteredCourseOptions.length)}`
+              : `${courseOptions.length.toLocaleString()} courses · showing first 80 — type to narrow`}
+          </div>
+
+          <button
+            type="button"
+            onClick={clearCourseFilter}
+            className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-100 ${courseFilter === 'ALL' && !courseSearch.trim() ? 'bg-indigo-50 text-indigo-900 font-medium' : 'text-slate-800 hover:bg-indigo-50/60'}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span>All courses</span>
+              <span className="text-[11px] text-slate-400">show everything</span>
+            </div>
+          </button>
+
+          {displayedCourseOptions.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-slate-500 text-center">
+              No courses match "{courseSearch}". Try fewer words.
+            </div>
+          ) : (
+            displayedCourseOptions.map(opt => (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => selectCourse(opt.label)}
+                className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-100 last:border-0 ${opt.label === courseFilter ? 'bg-indigo-50 text-indigo-900 font-medium' : 'text-slate-800 hover:bg-indigo-50/60'}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="truncate">{opt.label}</div>
+                  <div className="shrink-0 text-[11px] text-slate-400">{opt.count} option{opt.count === 1 ? '' : 's'}</div>
+                </div>
+              </button>
+            ))
+          )}
+
+          {filteredCourseOptions.length > 80 && (
+            <div className="px-4 py-2.5 text-[11px] text-slate-500 bg-slate-50 border-t border-slate-200 text-center">
+              + {filteredCourseOptions.length - 80} more courses hidden — keep typing to narrow
+            </div>
+          )}
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -837,6 +1017,14 @@ function simulate(r, delta) {
   let p = 1 / (1 + Math.exp(-k * margin));
   p = Math.max(0.01, Math.min(0.99, p)) * 100;
   return Math.round(p * 10) / 10;
+}
+
+function normalizeForSearch(value = '') {
+  return value
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 function toneToBar(t) {
