@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation';
 
 const FEATURES = [
   {
+    title: 'CUET 2026 Expected Cutoffs — Built on Real Data and Advanced Algorithms',
+    desc: 'Every cutoff projection on this platform is computed using official NTA CUET press releases, DU 2025 Round 1 cutoffs, category-wise candidate pool growth, top-score density shifts, and subject normalisation changes. A 12-factor statistical model processes all of this — not random percentages or copied numbers. Click "How was this calculated?" on any program card to see the exact breakdown of every factor and its contribution.',
+    tip: 'Every projection comes with a confidence score and an uncertainty range. You can inspect the full math yourself — no black boxes, no hidden assumptions.'
+  },
+  {
     title: '5-Step Score Entry',
     desc: 'Enter your CUET subjects, NTA scores, category, and name. The platform auto-filters programs based on your subject combination — you only see courses you are actually eligible for.',
     tip: 'You can select up to 5 subjects in any valid CUET combination (e.g. 1 Language + 4 Domains, or 3 Domains + 1 Language + GAT).'
