@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, memo } from 'react';
+import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { SUBJECT_BY_CODE } from '@/lib/subjects';
 import { SUBJECT_STATS, CATEGORY_POOL } from '@/lib/cuet2026';
@@ -9,6 +9,7 @@ export default function ResultsPage() {
   const router = useRouter();
   const [data, setData] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [editingDream, setEditingDream] = useState(false);
 
   useEffect(() => {
     try {
@@ -26,6 +27,20 @@ export default function ResultsPage() {
   const results = response?.results || [];
   const dream = payload.dreamProgramId ? results.find(r => r.id === Number(payload.dreamProgramId)) : null;
 
+  const handleDreamChange = (newDreamId) => {
+    const selected = results.find(r => r.id === Number(newDreamId));
+    if (!selected) return;
+    const newPayload = {
+      ...payload,
+      dreamProgramId: Number(newDreamId),
+      dreamLabel: `${selected.college} — ${selected.program}`
+    };
+    const newData = { ...data, payload: newPayload };
+    setData(newData);
+    sessionStorage.setItem('cuet:results', JSON.stringify(newData));
+    setEditingDream(false);
+  };
+
   return (
     <div className="space-y-10 animate-in">
       <ResultsHero name={payload.name} category={payload.category} totalEligible={results.length} persisted={response?.persisted} />
@@ -36,7 +51,14 @@ export default function ResultsPage() {
       {dream && (
         <section>
           <SectionDivider label="★ Your dream college" color="amber" />
-          <DreamReport r={dream} category={payload.category} />
+          <DreamReport
+            r={dream}
+            category={payload.category}
+            results={results}
+            editingDream={editingDream}
+            setEditingDream={setEditingDream}
+            onChangeDream={handleDreamChange}
+          />
         </section>
       )}
 
@@ -149,7 +171,7 @@ function SubjectCard({ item }) {
 /* ============================================================
    DREAM REPORT — full visual report (like Claude's example)
    ============================================================ */
-function DreamReport({ r, category }) {
+function DreamReport({ r, category, results, editingDream, setEditingDream, onChangeDream }) {
   const [whatIf, setWhatIf] = useState(0);
   const p = r.probability.p ?? 0;
   const tone = r.probability.verdict?.tone || 'unknown';
@@ -178,6 +200,25 @@ function DreamReport({ r, category }) {
         </div>
         <Verdict tone={tone} label={r.probability.verdict?.label} emoji={r.probability.verdict?.emoji} big />
       </div>
+
+      {/* Change dream college */}
+      {!editingDream && (
+        <button
+          onClick={() => setEditingDream(true)}
+          className="mb-6 text-sm font-semibold text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1"
+        >
+          Change your dream college?
+        </button>
+      )}
+
+      {editingDream && (
+        <DreamSelector
+          results={results}
+          currentId={r.id}
+          onSelect={onChangeDream}
+          onCancel={() => setEditingDream(false)}
+        />
+      )}
 
       {/* 4-stat KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
@@ -470,6 +511,86 @@ function UncertaintyNote({ r }) {
       <ol className="space-y-1 text-xs text-amber-900 list-decimal list-inside">
         {notes.map((n, i) => <li key={i}>{n}</li>)}
       </ol>
+    </div>
+  );
+}
+
+/* ============================================================
+   DREAM COLLEGE SELECTOR — change dream without re-submitting
+   ============================================================ */
+function DreamSelector({ results, currentId, onSelect, onCancel }) {
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+
+  // Click outside closes the selector
+  useEffect(() => {
+    function onClick(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        onCancel();
+      }
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [onCancel]);
+
+  const options = useMemo(() => {
+    return results.map(r => ({
+      id: r.id,
+      label: `${r.college} — ${r.program}`
+    }));
+  }, [results]);
+
+  const filtered = useMemo(() => {
+    const q = normalizeSearch(search);
+    if (!q) return options;
+    const tokens = q.split(/\s+/).filter(Boolean);
+    return options.filter(o => {
+      const hay = normalizeSearch(o.label);
+      return tokens.every(t => hay.includes(t));
+    });
+  }, [search, options]);
+
+  const displayed = useMemo(() => filtered.slice(0, 80), [filtered]);
+
+  return (
+    <div ref={wrapperRef} className="mb-6 bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm font-semibold text-indigo-900">Select a new dream college</div>
+        <button onClick={onCancel} className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors">Cancel</button>
+      </div>
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search college or course…"
+        className="field mb-2"
+        autoFocus
+      />
+      <div className="text-[11px] text-slate-500 mb-1">
+        {search
+          ? `${filtered.length.toLocaleString()} match${filtered.length === 1 ? '' : 'es'}`
+          : `${options.length.toLocaleString()} eligible programs`}
+      </div>
+      <div className="border border-slate-200 rounded-xl bg-white max-h-72 overflow-y-auto">
+        {displayed.length === 0 ? (
+          <div className="p-4 text-sm text-slate-500 text-center">No programs match your search.</div>
+        ) : (
+          displayed.map(o => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onSelect(o.id)}
+              className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-100 last:border-0 ${o.id === currentId ? 'bg-indigo-50 text-indigo-900 font-medium' : 'text-slate-800 hover:bg-indigo-50/60'}`}
+            >
+              <div className="truncate">{o.label}</div>
+            </button>
+          ))
+        )}
+        {filtered.length > 80 && (
+          <div className="px-4 py-2 text-[11px] text-slate-500 bg-slate-50 text-center border-t border-slate-200">
+            + {filtered.length - 80} more programs — type to narrow
+          </div>
+        )}
+      </div>
     </div>
   );
 }
