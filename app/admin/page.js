@@ -202,12 +202,17 @@ export default function AdminPage() {
 
   // -------- CSV EXPORT --------
   function downloadCSV() {
-    // Clean, structured CSV — same columns as the table on screen.
-    // Subject-wise scores are intentionally NOT spread across columns;
-    // open any student row in the dashboard for the in-depth breakdown.
+    // All 38 possible subject codes for column headers
+    const ALL_SUBJECTS = [
+      '101','102','103','104','105','106','107','108','109','110','111','112','113',
+      '301','302','303','304','305','306','307','308','309','312','313','314','315','316','318','319','320','321','322','323','324','325','326',
+      '501'
+    ];
+
     const headers = [
       'Date', 'Name', 'Category', 'Dream College',
-      'Composite Score', 'Dream Probability (%)', 'Subjects Taken'
+      'Composite Score', 'Dream Probability (%)', 'Subjects Taken',
+      ...ALL_SUBJECTS.map(c => `${c} (${SUBJECT_BY_CODE[c]?.name || c})`)
     ];
 
     const esc = (v) => {
@@ -220,9 +225,10 @@ export default function AdminPage() {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
       });
+      const scores = e.scores || {};
       const subjectsCount = Array.isArray(e.subjects_taken)
         ? e.subjects_taken.length
-        : Object.keys(e.scores || {}).length;
+        : Object.keys(scores).length;
       return [
         esc(date),
         esc(e.name || 'anonymous'),
@@ -230,7 +236,8 @@ export default function AdminPage() {
         esc(e.dream_label || '—'),
         esc(e.composite_top?.toFixed(2) ?? ''),
         esc(e.dream_probability ?? ''),
-        esc(`${subjectsCount} subjects`)
+        esc(`${subjectsCount} subjects`),
+        ...ALL_SUBJECTS.map(c => esc(scores[c] ?? ''))
       ].join(',');
     });
 

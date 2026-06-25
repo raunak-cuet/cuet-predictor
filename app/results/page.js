@@ -191,6 +191,9 @@ function DreamReport({ r, category }) {
       {/* Big verdict block */}
       <BigVerdictBlock r={r} category={catLabel} showSeats={showSeats} urSeats={urSeats} />
 
+      {/* What-If slider for dream college */}
+      <DreamWhatIf r={r} />
+
       {/* Key uncertainties */}
       <UncertaintyNote r={r} />
 
@@ -395,6 +398,34 @@ function BigVerdictBlock({ r, category, showSeats, urSeats }) {
 }
 
 /* ============================================================
+   DREAM WHAT-IF SLIDER
+   ============================================================ */
+function DreamWhatIf({ r }) {
+  const [whatIf, setWhatIf] = useState(0);
+  const simP = simulate(r, whatIf);
+
+  return (
+    <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
+      <div className="flex justify-between items-center text-sm mb-2">
+        <span className="font-semibold text-indigo-900">What-if scenario</span>
+        <span className="font-mono tabular-nums text-indigo-700">
+          {whatIf >= 0 ? '+' : ''}{whatIf} marks → <b>{simP == null ? '—' : `${simP}%`}</b>
+        </span>
+      </div>
+      <input
+        type="range" min="-50" max="100" step="1" value={whatIf}
+        onChange={(e) => setWhatIf(Number(e.target.value))}
+        className="w-full"
+      />
+      <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+        <span>−50 marks</span>
+        <span>+100 marks</span>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    Uncertainties
    ============================================================ */
 function UncertaintyNote({ r }) {
@@ -430,13 +461,24 @@ function AllResults({ results, dreamId }) {
   const [filter, setFilter] = useState('ALL');
   const [sort, setSort] = useState('PROB');
   const [search, setSearch] = useState('');
+  const [courseFilter, setCourseFilter] = useState('ALL');
   const [visibleCount, setVisibleCount] = useState(50);   // render-cap for performance
+
+  // Extract unique course types from results
+  const courseTypes = useMemo(() => {
+    const types = new Set();
+    for (const r of results) {
+      if (r.program) types.add(r.program);
+    }
+    return [...types].sort();
+  }, [results]);
 
   const items = useMemo(() => {
     let arr = results.filter(r => r.id !== dreamId);
     if (filter === 'SAFE')  arr = arr.filter(r => (r.probability.p ?? 0) >= 75);
     if (filter === 'MID')   arr = arr.filter(r => { const p = r.probability.p ?? -1; return p >= 50 && p < 75; });
     if (filter === 'RISKY') arr = arr.filter(r => (r.probability.p ?? 0) < 50);
+    if (courseFilter !== 'ALL') arr = arr.filter(r => r.program === courseFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       arr = arr.filter(r => (r.college + ' ' + r.program).toLowerCase().includes(q));
@@ -449,7 +491,7 @@ function AllResults({ results, dreamId }) {
   }, [results, filter, sort, search, dreamId]);
 
   // Reset pagination whenever filter/sort/search change so the user sees fresh top results
-  useEffect(() => { setVisibleCount(50); }, [filter, sort, search]);
+  useEffect(() => { setVisibleCount(50); }, [filter, sort, search, courseFilter]);
 
   const displayed = items.slice(0, visibleCount);
   const hasMore = items.length > visibleCount;
@@ -463,6 +505,13 @@ function AllResults({ results, dreamId }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search college / course…" className="field !py-2 text-sm w-56" />
+          <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="field !py-2 text-sm">
+            <option value="ALL">All courses</option>
+            {courseTypes.slice(0, 50).map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+            {courseTypes.length > 50 && <option disabled>+ {courseTypes.length - 50} more — use search</option>}
+          </select>
           <select value={filter} onChange={(e) => setFilter(e.target.value)} className="field !py-2 text-sm">
             <option value="ALL">All chances</option>
             <option value="SAFE">🟢 Safe (≥75%)</option>
@@ -759,28 +808,20 @@ function simulate(r, delta) {
   const newScore = r.yourComposite + delta;
   const margin = newScore - proj.mostLikely;
   const sigma = proj.sigma;
-  let k = 1.0 / sigma;
+
+  // k = ln(3) / sigma — mathematically derived (P(+σ) ≈ 75%, P(0) = 50%, P(-σ) ≈ 25%)
+  // No free parameters. No elite floor hacks. The logistic IS the model.
+  const LN3 = 1.09861228867;
+  let k = LN3 / sigma;
+
+  // Seat-scarcity sharpening: tiny pools → steeper curve
   const seats = r.probability.seatsConsidered;
   if (seats && seats > 0) {
     const seatAdj = Math.sqrt(40 / Math.max(seats, 5));
     k *= Math.max(0.85, Math.min(1.3, seatAdj));
   }
+
   let p = 1 / (1 + Math.exp(-k * margin));
-
-  // Top-tier rank boost (mirrors server-side logic)
-  if (proj.formulaMax26 && newScore > 0) {
-    const studentPctOfMax = newScore / proj.formulaMax26;
-    if (studentPctOfMax >= 0.90 && margin >= 3) {
-      let eliteFloor;
-      if      (studentPctOfMax >= 0.96) eliteFloor = 0.97;
-      else if (studentPctOfMax >= 0.94) eliteFloor = 0.92;
-      else if (studentPctOfMax >= 0.92) eliteFloor = 0.82;
-      else if (studentPctOfMax >= 0.90) eliteFloor = 0.70;
-      else                              eliteFloor = 0;
-      p = Math.max(p, eliteFloor);
-    }
-  }
-
   p = Math.max(0.01, Math.min(0.99, p)) * 100;
   return Math.round(p * 10) / 10;
 }
