@@ -53,6 +53,7 @@ export default function RootLayout({ children }) {
                 </a>
                 <div className="flex items-center gap-1 sm:gap-2 text-sm">
                   <a href="/" className="px-2.5 py-1.5 sm:px-3 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Home</a>
+                  <a href="/how-to-use" className="px-2.5 py-1.5 sm:px-3 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">How to Use</a>
                   <a href="/admin" className="px-2.5 py-1.5 sm:px-3 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">Admin</a>
                 </div>
               </nav>

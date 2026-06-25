@@ -203,12 +203,12 @@ function DreamReport({ r, category }) {
           )}
         </div>
         <input
-          type="range" min="-50" max="100" step="1" value={whatIf}
+          type="range" min="-100" max="100" step="1" value={whatIf}
           onChange={(e) => setWhatIf(Number(e.target.value))}
           className="w-full"
         />
         <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-          <span>−50 marks</span>
+          <span>-100 marks</span>
           <span className={whatIf === 0 ? 'font-semibold text-slate-600' : ''}>0</span>
           <span>+100 marks</span>
         </div>
@@ -603,7 +603,7 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
           <span className="text-slate-500">What-if: {whatIf >= 0 ? '+' : ''}{whatIf} marks</span>
           <span className="font-semibold text-slate-900 tabular-nums">→ {simP == null ? '—' : `${simP}%`}</span>
         </div>
-        <input type="range" min="-50" max="100" step="1" value={whatIf} onChange={(e) => setWhatIf(Number(e.target.value))} className="w-full mt-1" />
+        <input type="range" min="-100" max="100" step="1" value={whatIf} onChange={(e) => setWhatIf(Number(e.target.value))} className="w-full mt-1" />
       </div>
 
       <FactorReveal r={r} />
@@ -619,7 +619,7 @@ function MiniPositionBar({ r, simulatedScore, hasShift }) {
   const low = proj.conservative;
   const high = proj.aggressive;
 
-  // Scale needs to accommodate slider extremes (−50 to +100), not just current values
+  // Scale needs to accommodate slider extremes (−100 to +100), not just current values
   const dispMin = Math.min(low - 40, actualScore - 60, displayScore - 20);
   const dispMax = Math.max(high + 40, actualScore + 110, displayScore + 20);
   const range = dispMax - dispMin;
