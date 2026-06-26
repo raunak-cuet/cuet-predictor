@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { SUBJECT_BY_CODE } from '@/lib/subjects';
 import { SUBJECT_STATS, CATEGORY_POOL } from '@/lib/cuet2026';
@@ -78,6 +79,8 @@ export default function ResultsPage() {
         <SectionDivider label="All eligible programs" color="indigo" />
         <AllResults results={results} dreamId={dream?.id} />
       </section>
+
+      <ReferralNudge />
 
       <DisclaimerCard />
     </div>
@@ -1324,7 +1327,7 @@ function ImportantDisclaimer() {
 }
 
 /* ============================================================
-   SHARE RESULTS — Viral shareable card
+   SHARE RESULTS — Viral shareable card (matches site branding)
    ============================================================ */
 function ShareResults({ name, category, results, dream }) {
   const [showModal, setShowModal] = useState(false);
@@ -1333,8 +1336,6 @@ function ShareResults({ name, category, results, dream }) {
   const cardRef = useRef(null);
 
   const firstName = (name || 'Student').split(' ')[0];
-  const top3 = useMemo(() => results.slice(0, 3), [results]);
-  const safeCount = useMemo(() => results.filter(r => (r.probability.p ?? 0) >= 75).length, [results]);
 
   const generateImage = useCallback(async () => {
     if (!cardRef.current) return;
@@ -1343,7 +1344,7 @@ function ShareResults({ name, category, results, dream }) {
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(cardRef.current, {
         scale: 2,
-        backgroundColor: null,
+        backgroundColor: '#ffffff',
         useCORS: true,
         logging: false,
       });
@@ -1355,12 +1356,13 @@ function ShareResults({ name, category, results, dream }) {
     setGenerating(false);
   }, []);
 
+  // Lock body scroll when modal is open
   useEffect(() => {
     if (showModal) {
+      document.body.style.overflow = 'hidden';
       setImageUrl(null);
-      // Small delay to let DOM render
-      const t = setTimeout(generateImage, 200);
-      return () => clearTimeout(t);
+      const t = setTimeout(generateImage, 300);
+      return () => { document.body.style.overflow = ''; clearTimeout(t); };
     }
   }, [showModal, generateImage]);
 
@@ -1372,27 +1374,40 @@ function ShareResults({ name, category, results, dream }) {
     a.click();
   };
 
-  const dreamP = dream?.probability?.p;
-  const dreamEmoji = dream?.probability?.verdict?.emoji || '';
+  const dreamP = dream ? Math.round(dream.probability?.p ?? 0) : null;
   const dreamCollege = dream?.college || '';
   const dreamProgram = dream?.program || '';
+  const dreamVerdict = dream?.probability?.verdict;
+  const dreamProj = dream?.projection;
+  const dreamComposite = dream?.yourComposite;
+  const dreamOutOf = dream?.outOf;
+  const dreamCutoff2025 = dream?.cutoff2025;
+  const dreamMargin = dream?.probability?.margin;
+  const dreamSeats = dream?.seats;
+  const catSeats = dreamSeats?.[category];
 
   const whatsappText = dream
-    ? `I just checked my DU admission chances on DreamSeat — ${Math.round(dreamP)}% for ${dreamCollege} ${dreamProgram}! Check yours free: https://dreamseat.vercel.app`
-    : `I just checked my DU admission chances on DreamSeat — ${safeCount} safe programs! Check yours free: https://dreamseat.vercel.app`;
+    ? `I just checked my DU admission chances on DreamSeat — ${dreamP}% for ${dreamCollege} ${dreamProgram}! Check yours free: https://dreamseat.vercel.app`
+    : `I just checked my DU admission chances on DreamSeat — ${results.length} eligible programs! Check yours free: https://dreamseat.vercel.app`;
 
   const twitterText = dream
-    ? `Just checked my DU 2026 admission chances on @DreamSeat — ${Math.round(dreamP)}% for ${dreamCollege}! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`
-    : `Just checked my DU 2026 admission chances on @DreamSeat — ${safeCount} safe programs! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`;
+    ? `Just checked my DU 2026 admission chances — ${dreamP}% for ${dreamCollege}! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`
+    : `Just checked my DU 2026 admission chances — ${results.length} eligible programs! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`;
 
-  const verdictColor = (tone) => ({
-    safe: '#10b981', good: '#3b82f6', mid: '#f59e0b', risk: '#fb923c', reach: '#ef4444'
-  }[tone] || '#94a3b8');
+  // Verdict badge colors matching the site
+  const vBadge = (tone) => {
+    const map = {
+      safe:  { bg: '#dcfce7', color: '#166534', border: '#bbf7d0' },
+      good:  { bg: '#dbeafe', color: '#1e40af', border: '#bfdbfe' },
+      mid:   { bg: '#fef3c7', color: '#92400e', border: '#fde68a' },
+      risk:  { bg: '#ffedd5', color: '#9a3412', border: '#fed7aa' },
+      reach: { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' },
+    };
+    return map[tone] || map.good;
+  };
 
-  const verdictBg = (tone) => ({
-    safe: 'rgba(16,185,129,0.15)', good: 'rgba(59,130,246,0.15)', mid: 'rgba(245,158,11,0.15)',
-    risk: 'rgba(251,146,60,0.15)', reach: 'rgba(239,68,68,0.15)'
-  }[tone] || 'rgba(148,163,184,0.15)');
+  // Score bar width helper
+  const barPct = (val, max) => val && max ? Math.min(100, Math.max(2, (val / max) * 100)) : 0;
 
   return (
     <>
@@ -1400,7 +1415,7 @@ function ShareResults({ name, category, results, dream }) {
       <div className="text-center">
         <button
           onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white font-bold text-sm hover:from-violet-700 hover:via-purple-700 hover:to-fuchsia-700 transition-all shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98]"
+          className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white font-bold text-sm hover:from-indigo-700 hover:via-violet-700 hover:to-purple-700 transition-all shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.02] active:scale-[0.98]"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
@@ -1411,163 +1426,235 @@ function ShareResults({ name, category, results, dream }) {
         <p className="mt-2 text-[11px] text-slate-400">Get a shareable card for WhatsApp, Instagram & Twitter</p>
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+      {/* Modal — uses createPortal to guarantee it's above everything */}
+      {showModal && createPortal(
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+        >
+          <div style={{ width: '100%', maxWidth: '480px', maxHeight: '92vh', background: '#fff', borderRadius: '18px', boxShadow: '0 25px 60px -12px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-900">Share your results</h3>
-              <button onClick={() => setShowModal(false)} className="h-7 w-7 grid place-items-center rounded-full hover:bg-slate-100 text-slate-500 text-sm">✕</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+              <span style={{ fontWeight: 600, fontSize: '15px', color: '#0f172a' }}>Share your results</span>
+              <button onClick={() => setShowModal(false)} style={{ height: '28px', width: '28px', display: 'grid', placeItems: 'center', borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#64748b' }}>✕</button>
             </div>
 
-            {/* Card preview */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {/* The actual card that gets captured */}
+            {/* Card preview (scrollable) */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: '#f8fafc' }}>
+              {/* ===== THE SHAREABLE CARD ===== */}
               <div ref={cardRef} style={{
-                width: '440px',
-                maxWidth: '100%',
-                margin: '0 auto',
-                background: 'linear-gradient(145deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)',
-                borderRadius: '20px',
-                padding: '28px 24px',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                color: 'white',
-                position: 'relative',
-                overflow: 'hidden',
+                width: '420px', maxWidth: '100%', margin: '0 auto',
+                background: '#ffffff',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0',
+                padding: '24px 22px',
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                color: '#0f172a',
+                boxSizing: 'border-box',
               }}>
-                {/* Decorative orbs */}
-                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '160px', height: '160px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.3), transparent 70%)' }} />
-                <div style={{ position: 'absolute', bottom: '-30px', left: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(6,182,212,0.2), transparent 70%)' }} />
-
-                {/* Logo area */}
-                <div style={{ position: 'relative', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.02em' }}>
-                    <span style={{ color: '#e879a0' }}>Dream</span><span style={{ color: '#d4a574' }}>Seat</span>
+                {/* Header — logo + CUET 2026 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: 'italic', fontSize: '22px', letterSpacing: '-0.01em' }}>
+                      <span style={{ color: '#312e81' }}>Dream</span><span style={{ color: '#4f46e5' }}>Seat</span>
+                    </span>
                   </div>
-                  <span style={{ fontSize: '9px', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>CUET 2026</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#94a3b8' }}>CUET 2026</span>
                 </div>
 
-                {/* Student name */}
-                <div style={{ position: 'relative', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>Predictions for</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: 'white', lineHeight: 1.1, marginTop: '4px' }}>{firstName}</div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: 'rgba(99,102,241,0.25)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}>{category}</span>
-                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>{results.length} eligible programs</span>
+                {/* Student info */}
+                <div style={{ marginBottom: '18px' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8' }}>Predictions for</div>
+                  <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '32px', color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{firstName}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>{category}</span>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>{results.length.toLocaleString()} eligible programs</span>
                   </div>
                 </div>
 
-                {/* Dream college (if exists) */}
+                {/* Dream college detail */}
                 {dream && (
-                  <div style={{ position: 'relative', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px' }}>
-                    <div style={{ fontSize: '9px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#fbbf24', fontWeight: 700, marginBottom: '6px' }}>★ DREAM COLLEGE</div>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'white', lineHeight: 1.3 }}>{dreamCollege}</div>
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{dreamProgram}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-                      <span style={{ fontSize: '28px', fontWeight: 800, color: verdictColor(dream.probability?.verdict?.tone), lineHeight: 1 }}>~{Math.round(dreamP)}%</span>
-                      <span style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '20px', background: verdictBg(dream.probability?.verdict?.tone), color: verdictColor(dream.probability?.verdict?.tone), fontWeight: 600 }}>{dreamEmoji} {dream.probability?.verdict?.label}</span>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
+                    {/* Dream header row */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '4px' }}>★ DREAM COLLEGE</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', lineHeight: 1.3 }}>{dreamProgram}</div>
+                      </div>
+                      {/* Verdict badge */}
+                      <div style={{ flexShrink: 0, fontSize: '10px', fontWeight: 700, padding: '4px 10px', borderRadius: '20px', background: vBadge(dreamVerdict?.tone).bg, color: vBadge(dreamVerdict?.tone).color, border: `1px solid ${vBadge(dreamVerdict?.tone).border}`, whiteSpace: 'nowrap' }}>
+                        {dreamVerdict?.emoji} {dreamVerdict?.label?.toUpperCase()}
+                      </div>
                     </div>
+
+                    {/* Big probability */}
+                    <div style={{ textAlign: 'center', padding: '14px 0 12px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', borderRadius: '12px', marginBottom: '14px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)' }}>ADMISSION CHANCE</div>
+                      <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '48px', color: '#ffffff', lineHeight: 1, marginTop: '2px' }}>~{dreamP}%</div>
+                    </div>
+
+                    {/* Stats grid — 2x2 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {[
+                        { label: 'YOUR COMPOSITE', value: dreamComposite?.toFixed(1), sub: `out of ${dreamOutOf}` },
+                        { label: 'EST. 2026 CUTOFF', value: dreamProj?.mostLikely != null ? Math.round(dreamProj.mostLikely) : '—', sub: dreamProj?.mostLikely != null ? `±${Math.round(dreamProj.sigma)}` : '' },
+                        { label: '2025 CUTOFF', value: dreamCutoff2025 != null ? Math.round(dreamCutoff2025) : '—', sub: dreamCutoff2025 != null ? `Rd 1 · ${category}` : '' },
+                        { label: `${category} SEATS`, value: typeof catSeats === 'number' ? catSeats : '—', sub: typeof catSeats === 'number' ? (catSeats === 0 ? 'no reserved' : 'this category') : '' },
+                      ].map((s, i) => (
+                        <div key={i} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#94a3b8' }}>{s.label}</div>
+                          <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{s.value}</div>
+                          {s.sub && <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '2px' }}>{s.sub}</div>}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Margin indicator */}
+                    {dreamMargin != null && (
+                      <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Your margin:</span>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: dreamMargin >= 0 ? '#16a34a' : '#dc2626' }}>
+                          {dreamMargin >= 0 ? '+' : ''}{dreamMargin.toFixed(1)} marks {dreamMargin >= 0 ? '✓' : '✗'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Top 3 programs */}
-                <div style={{ position: 'relative', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '9px', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 700, marginBottom: '10px' }}>TOP 3 MOST LIKELY</div>
-                  {top3.map((r, i) => {
-                    const p = r.probability.p ?? 0;
-                    const tone = r.probability.verdict?.tone || 'unknown';
-                    return (
-                      <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: i < 2 ? '8px' : '0', padding: '8px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', width: '16px', flexShrink: 0 }}>#{i + 1}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.college}</div>
-                          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.program}</div>
-                        </div>
-                        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                          <div style={{ fontSize: '16px', fontWeight: 800, color: verdictColor(tone), lineHeight: 1 }}>{Math.round(p)}%</div>
-                          <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)' }}>{r.probability.verdict?.emoji}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Stats row */}
-                <div style={{ position: 'relative', display: 'flex', gap: '8px', marginBottom: '20px' }}>
-                  <div style={{ flex: 1, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '22px', fontWeight: 800, color: '#10b981' }}>{safeCount}</div>
-                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Safe (75%+)</div>
-                  </div>
-                  <div style={{ flex: 1, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '22px', fontWeight: 800, color: '#6366f1' }}>{results.length}</div>
-                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Total Eligible</div>
-                  </div>
-                </div>
-
                 {/* Footer CTA */}
-                <div style={{ position: 'relative', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                    Check your real admission probability at your dream college free
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.5 }}>
+                    Check your real admission probability at your dream college free →
                   </div>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#a78bfa', marginTop: '4px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#4f46e5', marginTop: '3px', letterSpacing: '-0.01em' }}>
                     dreamseat.vercel.app
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Share actions */}
-            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50">
+            {/* Share action bar */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
               {generating ? (
-                <div className="text-center text-sm text-slate-500 py-2">
-                  <span className="inline-block animate-spin mr-2">⏳</span> Generating your card...
-                </div>
+                <div style={{ textAlign: 'center', fontSize: '13px', color: '#64748b', padding: '8px 0' }}>Generating your card...</div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
                   <button onClick={downloadImage} disabled={!imageUrl}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-40 transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Download
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '10px 4px', borderRadius: '10px', border: 'none', background: '#0f172a', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: imageUrl ? 'pointer' : 'default', opacity: imageUrl ? 1 : 0.4 }}>
+                    ↓ Download
                   </button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#25D366] text-white text-xs font-semibold hover:bg-[#1ebe57] transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 0 0 .611.611l4.458-1.495A11.933 11.933 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.396 0-4.612-.77-6.42-2.076l-.253-.183-3.237 1.085 1.085-3.237-.183-.253A9.955 9.955 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '10px 4px', borderRadius: '10px', border: 'none', background: '#25D366', color: '#fff', fontSize: '11px', fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
                     WhatsApp
                   </a>
                   <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterText)}`} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-black text-white text-xs font-semibold hover:bg-gray-800 transition-colors">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '10px 4px', borderRadius: '10px', border: 'none', background: '#000000', color: '#fff', fontSize: '11px', fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
                     Twitter / X
                   </a>
                   <button
                     onClick={async () => {
                       if (imageUrl && navigator.share && /Mobi/i.test(navigator.userAgent)) {
                         try {
-                          const res = await fetch(imageUrl);
-                          const blob = await res.blob();
+                          const r = await fetch(imageUrl);
+                          const blob = await r.blob();
                           const file = new File([blob], 'DreamSeat-Results.png', { type: 'image/png' });
                           await navigator.share({ files: [file], title: 'My DreamSeat Results' });
                         } catch {}
                       } else {
-                        try {
-                          await navigator.clipboard.writeText('https://dreamseat.vercel.app');
-                          alert('Link copied! Paste it anywhere.');
-                        } catch { alert('https://dreamseat.vercel.app'); }
+                        try { await navigator.clipboard.writeText('https://dreamseat.vercel.app'); alert('Link copied!'); }
+                        catch { alert('https://dreamseat.vercel.app'); }
                       }
                     }}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-orange-500 text-white text-xs font-semibold hover:from-pink-600 hover:to-orange-600 transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    {/Mobi/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '') ? 'More' : 'Copy Link'}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '10px 4px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#334155', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    Copy Link
                   </button>
                 </div>
               )}
-              <p className="text-center text-[10px] text-slate-400 mt-2.5">Download the image to share on Instagram Stories</p>
+              <div style={{ textAlign: 'center', fontSize: '10px', color: '#94a3b8', marginTop: '8px' }}>Download the image to share on Instagram Stories</div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
+  );
+}
+
+/* ============================================================
+   REFERRAL NUDGE — emotional-peak share prompt
+   ============================================================ */
+function ReferralNudge() {
+  const [copied, setCopied] = useState(false);
+  const url = 'https://dreamseat.vercel.app';
+  const waText = "Hey! I just checked my DU admission chances on DreamSeat — it shows your probability for every college based on your CUET scores. You should try it too, it's free: " + url;
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(url); } catch { /* fallback */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden">
+      {/* Gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-violet-50 to-fuchsia-50 border border-indigo-100 rounded-2xl" />
+      <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-gradient-to-br from-violet-200 to-fuchsia-200 blur-3xl opacity-40 -translate-y-12 translate-x-12" />
+
+      <div className="relative px-6 py-8 sm:py-10 text-center">
+        {/* Emoji topper */}
+        <div className="text-3xl mb-3">🎯</div>
+
+        <h3 className="font-display text-xl sm:text-2xl text-slate-900 leading-snug">
+          Know someone waiting for their<br className="hidden sm:inline" /> CUET results analysis?
+        </h3>
+        <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto">
+          Share DreamSeat with them — it takes 30 seconds to check their real admission chances at every DU college. Completely free.
+        </p>
+
+        {/* Share buttons */}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(waText)}`}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] text-white text-sm font-semibold hover:bg-[#1ebe57] transition-colors shadow-md shadow-green-500/20"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 0 0 .611.611l4.458-1.495A11.933 11.933 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.396 0-4.612-.77-6.42-2.076l-.253-.183-3.237 1.085 1.085-3.237-.183-.253A9.955 9.955 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            WhatsApp
+          </a>
+
+          <button
+            onClick={copyLink}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm"
+          >
+            {copied ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span className="text-emerald-700">Copied!</span>
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy Link
+              </>
+            )}
+          </button>
+
+          <a
+            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("Check your real DU 2026 admission chances based on your CUET scores — free tool that covers all 1,526 programs 🎯\n\n" + url)}`}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-white text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            Twitter / X
+          </a>
+        </div>
+
+        <p className="mt-4 text-[11px] text-slate-400">
+          Every student you share with gets the same free analysis — no signups, no fees, no catch.
+        </p>
+      </div>
+    </div>
   );
 }
 
