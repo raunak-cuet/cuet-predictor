@@ -44,9 +44,8 @@ export default function RootLayout({ children }) {
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4">
               <nav className="card flex items-center justify-between px-3 sm:px-6 py-2 sm:py-4">
                 <a href="/" className="flex items-center gap-2 sm:gap-3 group min-w-0">
-                  <Logo />
                   <div className="leading-tight min-w-0">
-                    <div className="font-semibold text-slate-900 text-sm sm:text-base leading-tight truncate">DreamSeat</div>
+                    <Logo />
                     <div className="hidden sm:block text-[9px] sm:text-[10px] uppercase tracking-[0.12em] text-slate-500 mt-0.5 sm:mt-1 whitespace-nowrap">
                       CUET 2026 College &amp; Cutoff Predictor
                     </div>
