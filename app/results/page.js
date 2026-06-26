@@ -236,7 +236,7 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiTile label="Composite score" value={r.yourComposite?.toFixed(2)} sub={`out of ${r.outOf}`} tone="emerald" />
           <KpiTile label="Admission chance" value={`~${Math.round(p)}%`} sub={<Verdict tone={tone} label={r.probability.verdict?.label} emoji={r.probability.verdict?.emoji} />} tone={tone} />
-          <KpiTile label="2025 cutoff (actual)" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? 'actual' : 'no data'} tone="slate" />
+          <KpiTile label="2025 cutoff (actual)" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? null : 'no data'} tone="slate" />
           <KpiTile label={`${category} seats`} value={showSeats && !zeroSeats ? urSeats : zeroSeats ? '0' : '—'} sub={zeroSeats ? 'no reserved seats' : showSeats ? 'this category' : 'merit-based'} tone={zeroSeats ? 'risk' : 'violet'} />
         </div>
       </div>
@@ -862,7 +862,7 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
 
       <div className="grid grid-cols-3 gap-2 mt-3">
         <SmallStat label="Composite" value={r.yourComposite?.toFixed(2)} sub={`/${r.outOf}`} />
-        <SmallStat label="2025 cutoff" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? 'actual' : 'n/a'} />
+        <SmallStat label="2025 cutoff" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? null : 'n/a'} />
         <SmallStat label="Margin" value={(r.probability.margin >= 0 ? '+' : '') + r.probability.margin?.toFixed(1)} positive={r.probability.margin >= 0} />
       </div>
 
@@ -1552,30 +1552,51 @@ function ShareResults({ payload, results, dream }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <StatBox label="YOUR COMPOSITE" value={dream.yourComposite?.toFixed(1)} sub={`out of ${dream.outOf}`} />
-                      <StatBox label="EST. 2026 CUTOFF" value={Math.round(dream.projection.mostLikely)} sub={`\u00B1${Math.round(dream.projection.sigma)}`} />
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <StatBox label="2025 CUTOFF" value={dream.cutoff2025 != null ? Math.round(dream.cutoff2025) : '\u2014'} sub={dream.cutoff2025 != null ? 'actual' : ''} />
-                      <StatBox label={`${category} SEATS`} value={typeof catSeats === 'number' ? catSeats : '\u2014'} sub={typeof catSeats === 'number' ? (catSeats === 0 ? 'no reserved' : 'this category') : ''} />
-                    </div>
-                  </div>
-
                   {dreamPos && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px' }}>SCORE POSITION vs CUTOFF</div>
-                      <div style={{ position: 'relative', height: '12px', borderRadius: '6px', background: '#e2e8f0' }}>
-                        <div style={{ position: 'absolute', top: '1px', bottom: '1px', left: dreamPos.pct(dreamPos.low) + '%', width: Math.max(3, dreamPos.pct(dreamPos.high) - dreamPos.pct(dreamPos.low)) + '%', borderRadius: '5px', background: 'linear-gradient(90deg,#fbbf24,#f59e0b)' }} />
-                        <div style={{ position: 'absolute', top: '50%', left: dreamPos.pct(dreamPos.you) + '%', transform: 'translate(-50%,-50%)', width: '16px', height: '16px', borderRadius: '50%', background: '#10b981', border: '3px solid #fff', boxShadow: '0 0 0 1px #10b981' }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                        <span style={{ fontSize: '10px', color: '#d97706', fontWeight: 700 }}>Cutoff: {Math.round(dreamPos.low)}{'\u2013'}{Math.round(dreamPos.high)}</span>
-                        <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>You: {dreamPos.you.toFixed(1)}</span>
+                    <div style={{ position: 'relative', overflow: 'hidden', marginBottom: '12px', padding: '14px 14px 13px', borderRadius: '14px', background: 'linear-gradient(135deg,#eef2ff 0%,#ffffff 52%,#f5f3ff 100%)', border: '1px solid #c7d2fe' }}>
+                      <div style={{ position: 'absolute', top: '-34px', right: '-28px', width: '92px', height: '92px', borderRadius: '50%', background: 'rgba(99,102,241,0.13)' }} />
+                      <div style={{ position: 'relative' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '12px' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#4f46e5', marginBottom: '4px' }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', display: 'inline-block' }} />
+                              Expected 2026 Cutoff
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                              <span style={{ fontSize: '38px', fontWeight: 900, letterSpacing: '-0.05em', color: '#312e81', lineHeight: 1 }}>{Math.round(dream.projection.mostLikely)}</span>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#818cf8' }}>/ {dream.outOf}</span>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                              <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '999px', padding: '2px 6px' }}>{Math.round(dream.projection.conservative)}</span>
+                              <span style={{ fontSize: '10px', color: '#cbd5e1' }}>–</span>
+                              <span style={{ fontSize: '11px', fontFamily: 'monospace', fontWeight: 800, color: '#4338ca', background: '#ffffff', border: '1px solid #a5b4fc', borderRadius: '999px', padding: '2px 7px' }}>{Math.round(dream.projection.mostLikely)}</span>
+                              <span style={{ fontSize: '10px', color: '#cbd5e1' }}>–</span>
+                              <span style={{ fontSize: '10px', fontFamily: 'monospace', color: '#7c3aed', background: '#faf5ff', border: '1px solid #ddd6fe', borderRadius: '999px', padding: '2px 6px' }}>{Math.round(dream.projection.aggressive)}</span>
+                            </div>
+                            <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '4px' }}>range · likely · high</div>
+                          </div>
+                        </div>
+
+                        <div style={{ position: 'relative', height: '13px', borderRadius: '8px', background: '#dbe4ff' }}>
+                          <div style={{ position: 'absolute', top: '2px', bottom: '2px', left: dreamPos.pct(dreamPos.low) + '%', width: Math.max(3, dreamPos.pct(dreamPos.high) - dreamPos.pct(dreamPos.low)) + '%', borderRadius: '7px', background: 'linear-gradient(90deg,#fbbf24,#818cf8,#a78bfa)' }} />
+                          <div style={{ position: 'absolute', top: '50%', left: dreamPos.pct(dream.projection.mostLikely) + '%', transform: 'translate(-50%,-50%)', width: '2px', height: '16px', borderRadius: '2px', background: '#4338ca' }} />
+                          <div style={{ position: 'absolute', top: '50%', left: dreamPos.pct(dreamPos.you) + '%', transform: 'translate(-50%,-50%)', width: '17px', height: '17px', borderRadius: '50%', background: '#10b981', border: '3px solid #fff', boxShadow: '0 0 0 1px #10b981' }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '7px' }}>
+                          <span style={{ fontSize: '10px', color: '#d97706', fontWeight: 800 }}>Cutoff: {Math.round(dreamPos.low)}{'\u2013'}{Math.round(dreamPos.high)}</span>
+                          <span style={{ fontSize: '10px', color: '#059669', fontWeight: 800 }}>You: {dreamPos.you.toFixed(1)}</span>
+                        </div>
                       </div>
                     </div>
                   )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '14px' }}>
+                    <StatBox label="YOUR COMPOSITE" value={dream.yourComposite?.toFixed(1)} sub={`out of ${dream.outOf}`} />
+                    <StatBox label="2025 CUTOFF" value={dream.cutoff2025 != null ? Math.round(dream.cutoff2025) : '\u2014'} />
+                    <StatBox label={`${category} SEATS`} value={typeof catSeats === 'number' ? catSeats : '\u2014'} sub={typeof catSeats === 'number' ? (catSeats === 0 ? 'no reserved' : 'this category') : ''} />
+                  </div>
 
                   <div style={{ textAlign: 'center', padding: '4px 0' }}>
                     <span style={{ fontSize: '12px', color: '#64748b' }}>Your margin: </span>
