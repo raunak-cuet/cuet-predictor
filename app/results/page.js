@@ -232,16 +232,14 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
 
       {/* ── KPI section: Expected 2026 Cutoff hero first, then supporting stats ── */}
       <div className="space-y-3 mb-6">
-        <CutoffHeroTile proj={proj} outOf={r.outOf} yourComposite={r.yourComposite} />
+        <CutoffHeroTile proj={proj} outOf={r.outOf} yourComposite={r.yourComposite} whatIf={whatIf} />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiTile label="Composite score" value={r.yourComposite?.toFixed(2)} sub={`out of ${r.outOf}`} tone="emerald" />
-          <KpiTile label="Admission chance" value={`~${Math.round(p)}%`} sub={r.probability.verdict?.label} tone={tone} />
-          <KpiTile label="2025 cutoff (actual)" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? `Rd 1 · ${category}` : 'no data'} tone="slate" />
+          <KpiTile label="Admission chance" value={`~${Math.round(p)}%`} sub={<Verdict tone={tone} label={r.probability.verdict?.label} emoji={r.probability.verdict?.emoji} />} tone={tone} />
+          <KpiTile label="2025 cutoff (actual)" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? 'actual' : 'no data'} tone="slate" />
           <KpiTile label={`${category} seats`} value={showSeats && !zeroSeats ? urSeats : zeroSeats ? '0' : '—'} sub={zeroSeats ? 'no reserved seats' : showSeats ? 'this category' : 'merit-based'} tone={zeroSeats ? 'risk' : 'violet'} />
         </div>
       </div>
-
-      <ScorePositionBar r={r} whatIf={whatIf} />
 
       <div className="mt-3">
         <div className="flex justify-between items-center text-sm mb-1.5">
@@ -281,18 +279,20 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
 /* ============================================================
    CUTOFF HERO TILE — the star of the show
    ============================================================ */
-function CutoffHeroTile({ proj, outOf, yourComposite }) {
+function CutoffHeroTile({ proj, outOf, yourComposite, whatIf = 0 }) {
   if (!proj.mostLikely) return null;
 
   const low = Math.round(proj.conservative);
   const mid = Math.round(proj.mostLikely);
   const high = Math.round(proj.aggressive);
   const sigma = Math.round(proj.sigma);
-  const margin = yourComposite != null ? (yourComposite - proj.mostLikely) : null;
+  const displayScore = yourComposite != null ? yourComposite + whatIf : null;
+  const hasShift = whatIf !== 0;
+  const margin = displayScore != null ? (displayScore - proj.mostLikely) : null;
   const isAbove = margin != null && margin >= 0;
 
-  const dispMin = Math.min(low - 30, yourComposite != null ? yourComposite - 40 : low - 30);
-  const dispMax = Math.max(high + 30, yourComposite != null ? yourComposite + 40 : high + 30);
+  const dispMin = Math.min(low - 30, yourComposite != null ? yourComposite - 40 : low - 30, displayScore != null ? displayScore - 30 : low - 30);
+  const dispMax = Math.max(high + 30, yourComposite != null ? yourComposite + 40 : high + 30, displayScore != null ? displayScore + 30 : high + 30);
   const range = dispMax - dispMin;
   const pct = (v) => Math.max(1, Math.min(99, ((v - dispMin) / range) * 100));
 
@@ -349,11 +349,20 @@ function CutoffHeroTile({ proj, outOf, yourComposite }) {
               className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-0.5 h-6 bg-indigo-700 rounded-full"
               style={{ left: `${pct(mid)}%` }}
             />
-            {/* your score dot */}
-            {yourComposite != null && (
+            {/* original score dot while dragging */}
+            {hasShift && yourComposite != null && (
               <div
                 className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
                 style={{ left: `${pct(yourComposite)}%` }}
+              >
+                <div className="h-5 w-5 rounded-full bg-emerald-300 ring-4 ring-white opacity-45 shadow-sm" />
+              </div>
+            )}
+            {/* active score dot */}
+            {displayScore != null && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out"
+                style={{ left: `${pct(displayScore)}%` }}
               >
                 <div className={`h-6 w-6 rounded-full ring-4 ring-white shadow-md ${isAbove ? 'bg-emerald-500' : 'bg-rose-500'}`} />
               </div>
@@ -376,14 +385,14 @@ function CutoffHeroTile({ proj, outOf, yourComposite }) {
             >{high}</span>
           </div>
 
-          {/* your score label */}
-          {yourComposite != null && (
+          {/* active score label */}
+          {displayScore != null && (
             <div className="relative h-4 text-[10px] font-bold tabular-nums">
               <span
-                className={`absolute -translate-x-1/2 whitespace-nowrap ${isAbove ? 'text-emerald-700' : 'text-rose-700'}`}
-                style={{ left: `${pct(yourComposite)}%` }}
+                className={`absolute -translate-x-1/2 whitespace-nowrap ${hasShift ? 'text-indigo-700' : isAbove ? 'text-emerald-700' : 'text-rose-700'}`}
+                style={{ left: `${pct(displayScore)}%` }}
               >
-                you: {yourComposite.toFixed(1)}
+                {hasShift ? 'adjusted' : 'you'}: {displayScore.toFixed(1)}
               </span>
             </div>
           )}
@@ -398,109 +407,15 @@ function CutoffHeroTile({ proj, outOf, yourComposite }) {
               <span className="inline-block h-2 w-0.5 bg-indigo-700 rounded-full" />
               Most likely: {mid}
             </span>
-            {yourComposite != null && (
+            {displayScore != null && (
               <span className="flex items-center gap-1.5">
                 <span className={`inline-block h-3 w-3 rounded-full ${isAbove ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                Your composite
+                {hasShift ? 'Adjusted composite' : 'Your composite'}
               </span>
             )}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   Score positioning bar
-   ============================================================ */
-function ScorePositionBar({ r, whatIf = 0 }) {
-  const proj = r.projection;
-  const outOf = r.outOf;
-  const low = proj.conservative;
-  const high = proj.aggressive;
-  const mid = proj.mostLikely;
-  const you = r.yourComposite;
-  const displayScore = you + whatIf;
-  const hasShift = whatIf !== 0;
-
-  const dispMin = Math.min(700, you - 60, low - 60, displayScore - 20);
-  const dispMax = Math.max(outOf, displayScore + 20);
-  const range = dispMax - dispMin;
-  const pct = (v) => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
-
-  const youX = pct(displayScore);
-  const bandX = pct((low + high) / 2);
-  const labelsOverlap = Math.abs(youX - bandX) < 18;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
-      <div className="flex items-baseline justify-between mb-2">
-        <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-600">Score positioning vs estimated 2026 cut-off</div>
-        <div className="text-[10px] text-slate-400">scale: {dispMin.toFixed(0)} – {dispMax}</div>
-      </div>
-
-      <div className="relative h-8 mt-2">
-        <Tag x={bandX} color="amber" level={labelsOverlap && youX < bandX ? 'high' : 'low'}>est. cut-off range</Tag>
-        <Tag x={youX}  color={hasShift ? 'indigo' : 'emerald'} level={labelsOverlap && youX >= bandX ? 'high' : 'low'}>
-          {hasShift ? `${you + whatIf >= you ? '+' : ''}${whatIf} adjusted` : 'your score'}
-        </Tag>
-      </div>
-
-      <div className="relative h-7">
-        <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-200 rounded-full -translate-y-1/2" />
-        <div
-          className="absolute top-1/2 h-3 -translate-y-1/2 rounded-full bg-gradient-to-r from-amber-300 to-amber-500"
-          style={{ left: `${pct(low)}%`, width: `${Math.max(2, pct(high) - pct(low))}%` }}
-          title={`Estimated cutoff band: ${low}–${high}`}
-        />
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(low)}%`, height: '18px' }}>
-          <div className="w-0.5 h-full bg-amber-700 rounded-full" />
-        </div>
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(high)}%`, height: '18px' }}>
-          <div className="w-0.5 h-full bg-amber-700 rounded-full" />
-        </div>
-        {hasShift && (
-          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(you)}%` }}>
-            <div className="h-4 w-4 rounded-full bg-emerald-300 ring-2 ring-white opacity-40" />
-          </div>
-        )}
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out" style={{ left: `${youX}%` }}>
-          <div className={`h-5 w-5 rounded-full ${hasShift ? 'bg-indigo-500 ring-indigo-200' : 'bg-emerald-500'} ring-4 ring-white shadow-lg`} />
-        </div>
-      </div>
-
-      <div className="relative mt-2 h-4 text-[10px] font-mono tabular-nums">
-        <span className="absolute left-0 text-slate-400">{dispMin.toFixed(0)}</span>
-        <span className="absolute -translate-x-1/2 text-amber-700 font-semibold" style={{ left: `${pct(low)}%` }}>{Math.round(low)}</span>
-        <span className="absolute -translate-x-1/2 text-amber-700 font-semibold" style={{ left: `${pct(high)}%` }}>{Math.round(high)}</span>
-        <span className="absolute right-0 text-slate-400">{dispMax}</span>
-      </div>
-
-      <div className="relative mt-1 h-4">
-        <div className="absolute -translate-x-1/2" style={{ left: `${youX}%` }}>
-          <span className={`text-[11px] font-bold tabular-nums whitespace-nowrap ${hasShift ? 'text-indigo-700' : 'text-emerald-700'}`}>
-            {(you + whatIf)?.toFixed(2)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Tag({ x, color, children, level = 'low' }) {
-  const colors = {
-    amber:   'text-amber-700 bg-amber-50 border border-amber-200',
-    emerald: 'text-emerald-700 bg-emerald-50 border border-emerald-200',
-    indigo:  'text-indigo-700 bg-indigo-50 border border-indigo-200'
-  };
-  const top = level === 'high' ? 0 : 18;
-  return (
-    <div
-      className={`absolute text-[10px] font-semibold px-1.5 py-0.5 rounded -translate-x-1/2 whitespace-nowrap ${colors[color]}`}
-      style={{ left: `${x}%`, top: `${top}px` }}
-    >
-      {children}
     </div>
   );
 }
@@ -941,11 +856,9 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
               <span className="text-[10px] font-mono tabular-nums text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">{Math.round(r.projection.aggressive)}</span>
             </div>
           </div>
-          <MiniCutoffBar r={r} />
+          <MiniCutoffBar r={r} whatIf={whatIf} />
         </div>
       )}
-
-      <MiniPositionBar r={r} simulatedScore={r.yourComposite + whatIf} hasShift={whatIf !== 0} />
 
       <div className="grid grid-cols-3 gap-2 mt-3">
         <SmallStat label="Composite" value={r.yourComposite?.toFixed(2)} sub={`/${r.outOf}`} />
@@ -976,16 +889,18 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
 /* ============================================================
    Mini cutoff bar — used in each ResultCard
    ============================================================ */
-function MiniCutoffBar({ r }) {
+function MiniCutoffBar({ r, whatIf = 0 }) {
   const proj = r.projection;
   const you = r.yourComposite;
   const low = proj.conservative;
   const high = proj.aggressive;
   const mid = proj.mostLikely;
-  const isAbove = you != null && you >= mid;
+  const displayScore = you != null ? you + whatIf : null;
+  const hasShift = whatIf !== 0;
+  const isAbove = displayScore != null && displayScore >= mid;
 
-  const dispMin = Math.min(low - 25, you != null ? you - 35 : low - 25);
-  const dispMax = Math.max(high + 25, you != null ? you + 35 : high + 25);
+  const dispMin = Math.min(low - 25, you != null ? you - 35 : low - 25, displayScore != null ? displayScore - 25 : low - 25);
+  const dispMax = Math.max(high + 25, you != null ? you + 35 : high + 25, displayScore != null ? displayScore + 25 : high + 25);
   const range = dispMax - dispMin;
   const pct = v => Math.max(1, Math.min(99, ((v - dispMin) / range) * 100));
 
@@ -1002,76 +917,36 @@ function MiniCutoffBar({ r }) {
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-0.5 h-3 bg-indigo-700 rounded-full"
           style={{ left: `${pct(mid)}%` }}
         />
-        {/* your score dot */}
-        {you != null && (
+        {/* original score dot while dragging */}
+        {hasShift && you != null && (
           <div
-            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200"
             style={{ left: `${pct(you)}%` }}
+          >
+            <div className="h-3 w-3 rounded-full bg-emerald-300 ring-2 ring-white opacity-50" />
+          </div>
+        )}
+        {/* active score dot */}
+        {displayScore != null && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out"
+            style={{ left: `${pct(displayScore)}%` }}
           >
             <div className={`h-3 w-3 rounded-full ring-2 ring-white ${isAbove ? 'bg-emerald-500' : 'bg-rose-500'}`} />
           </div>
         )}
       </div>
       {/* score label */}
-      {you != null && (
+      {displayScore != null && (
         <div className="relative h-3.5 mt-0.5">
           <span
-            className={`absolute -translate-x-1/2 text-[9px] font-bold tabular-nums whitespace-nowrap ${isAbove ? 'text-emerald-700' : 'text-rose-700'}`}
-            style={{ left: `${pct(you)}%` }}
+            className={`absolute -translate-x-1/2 text-[9px] font-bold tabular-nums whitespace-nowrap ${hasShift ? 'text-indigo-700' : isAbove ? 'text-emerald-700' : 'text-rose-700'}`}
+            style={{ left: `${pct(displayScore)}%` }}
           >
-            you: {you.toFixed(1)}
+            {hasShift ? 'adjusted' : 'you'}: {displayScore.toFixed(1)}
           </span>
         </div>
       )}
-    </div>
-  );
-}
-
-function MiniPositionBar({ r, simulatedScore, hasShift }) {
-  const proj = r.projection;
-  const actualScore = r.yourComposite;
-  const displayScore = typeof simulatedScore === 'number' ? simulatedScore : actualScore;
-  const low = proj.conservative;
-  const high = proj.aggressive;
-
-  const dispMin = Math.min(low - 40, actualScore - 60, displayScore - 20);
-  const dispMax = Math.max(high + 40, actualScore + 110, displayScore + 20);
-  const range = dispMax - dispMin;
-  const pct = v => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
-
-  return (
-    <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 mt-2">
-      <div className="text-[10px] text-slate-500 mb-1.5 flex justify-between">
-        <span>Position vs 2026 cutoff band</span>
-        <span className="tabular-nums">{Math.round(low)}–{Math.round(high)}</span>
-      </div>
-      <div className="relative h-3">
-        <div className="absolute inset-x-0 top-1/2 h-1.5 bg-slate-200 rounded-full -translate-y-1/2" />
-        <div
-          className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-amber-400"
-          style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }}
-        />
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(low)}%`, height: '12px' }}>
-          <div className="w-0.5 h-full bg-amber-600 rounded-full" />
-        </div>
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(high)}%`, height: '12px' }}>
-          <div className="w-0.5 h-full bg-amber-600 rounded-full" />
-        </div>
-        {hasShift && (
-          <div
-            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200"
-            style={{ left: `${pct(actualScore)}%` }}
-          >
-            <div className="h-3 w-3 rounded-full bg-emerald-300 ring-2 ring-white opacity-50" />
-          </div>
-        )}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out"
-          style={{ left: `${pct(displayScore)}%` }}
-        >
-          <div className={`h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white shadow ${hasShift ? 'ring-emerald-200' : ''}`} />
-        </div>
-      </div>
     </div>
   );
 }
@@ -1683,7 +1558,7 @@ function ShareResults({ payload, results, dream }) {
                       <StatBox label="EST. 2026 CUTOFF" value={Math.round(dream.projection.mostLikely)} sub={`\u00B1${Math.round(dream.projection.sigma)}`} />
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <StatBox label="2025 CUTOFF" value={dream.cutoff2025 != null ? Math.round(dream.cutoff2025) : '\u2014'} sub={dream.cutoff2025 != null ? `Rd 1 \u00B7 ${category}` : ''} />
+                      <StatBox label="2025 CUTOFF" value={dream.cutoff2025 != null ? Math.round(dream.cutoff2025) : '\u2014'} sub={dream.cutoff2025 != null ? 'actual' : ''} />
                       <StatBox label={`${category} SEATS`} value={typeof catSeats === 'number' ? catSeats : '\u2014'} sub={typeof catSeats === 'number' ? (catSeats === 0 ? 'no reserved' : 'this category') : ''} />
                     </div>
                   </div>
