@@ -267,7 +267,7 @@ export default function Home() {
             Now projecting 2026 DU cutoffs
           </span>
         </div>
-        <h1 className="mt-6 font-display text-[2.25rem] sm:text-4xl md:text-5xl lg:text-[3.5rem] leading-[1.15] sm:leading-[1.1] text-slate-900 mx-auto px-2">
+        <h1 className="mt-6 font-display text-[clamp(1.75rem,6vw,2.25rem)] sm:text-4xl md:text-5xl lg:text-[3.5rem] leading-[1.15] sm:leading-[1.1] text-slate-900 mx-auto px-2">
           Stop guessing your DU rank.<br />
           <span className="italic">Let{' '}
             <span className="relative inline-block">
