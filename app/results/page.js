@@ -1532,11 +1532,86 @@ function ShareResults({ payload, results, dream }) {
       <span>{dreamVerdict?.emoji}</span><span>{dreamVerdict?.label}</span>
     </div>
   </div>
-                  {/* Big probability banner */}
-                  <div style={{ textAlign: 'center', padding: '20px 16px 22px', background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%)', borderRadius: '14px', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', marginBottom: '4px' }}>ADMISSION CHANCE</div>
-                    <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '52px', color: '#ffffff', lineHeight: 1.15, paddingTop: '6px', paddingBottom: '6px', letterSpacing: '-0.01em' }}>~{dreamP}%</div>
-                  </div>
+                  {/* Probability hero — horizontal layout (html2canvas-safe) */}
+<div style={{
+  display: 'flex',
+  alignItems: 'stretch',
+  background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 55%, #8b5cf6 100%)',
+  borderRadius: '14px',
+  marginBottom: '14px',
+  overflow: 'hidden',
+  boxShadow: '0 8px 20px -8px rgba(124, 58, 237, 0.5)',
+}}>
+  {/* Left: the big number */}
+  <div style={{
+    flex: '0 0 auto',
+    padding: '18px 22px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    borderRight: '1px solid rgba(255,255,255,0.18)',
+  }}>
+    <div style={{
+      fontFamily: "'Inter', system-ui, sans-serif",
+      fontWeight: 800,
+      fontSize: '54px',
+      color: '#ffffff',
+      lineHeight: 1,
+      letterSpacing: '-0.03em',
+    }}>
+      {dreamP}<span style={{ fontSize: '32px', fontWeight: 700, marginLeft: '2px' }}>%</span>
+    </div>
+    <div style={{
+      fontSize: '10px',
+      fontWeight: 700,
+      letterSpacing: '0.14em',
+      textTransform: 'uppercase',
+      color: 'rgba(255,255,255,0.75)',
+      marginTop: '4px',
+    }}>
+      admission chance
+    </div>
+  </div>
+
+  {/* Right: contextual readout */}
+  <div style={{
+    flex: 1,
+    padding: '18px 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    minWidth: 0,
+  }}>
+    <div style={{
+      fontSize: '9px',
+      fontWeight: 700,
+      letterSpacing: '0.14em',
+      textTransform: 'uppercase',
+      color: 'rgba(255,255,255,0.7)',
+      marginBottom: '6px',
+    }}>
+      verdict
+    </div>
+    <div style={{
+      fontSize: '18px',
+      fontWeight: 800,
+      color: '#ffffff',
+      lineHeight: 1.15,
+      letterSpacing: '-0.01em',
+    }}>
+      {dreamVerdict?.emoji} {dreamVerdict?.label}
+    </div>
+    <div style={{
+      fontSize: '11px',
+      color: 'rgba(255,255,255,0.8)',
+      marginTop: '6px',
+      lineHeight: 1.4,
+    }}>
+      Based on your composite of {dream.yourComposite?.toFixed(1)}
+    </div>
+  </div>
+</div>
 
                   {/* Stats 2×2 grid using flex (html2canvas-safe) */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
