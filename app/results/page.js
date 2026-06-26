@@ -1225,17 +1225,18 @@ function ImportantDisclaimer() {
 }
 
 /* ============================================================
-   SHARE RESULTS — Branded shareable card (matches site exactly)
+   SHARE RESULTS — Branded shareable card
    ============================================================ */
 function ShareResults({ payload, results, dream }) {
   const [showModal, setShowModal] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
+  const [genError, setGenError] = useState(null);
+  const [shareMsg, setShareMsg] = useState('');
   const cardRef = useRef(null);
 
   const name = payload.name || 'Student';
   const category = payload.category || 'UR';
-  const firstName = name;
 
   const subjectBars = useMemo(() => {
     const codes = payload.subjectsTaken || Object.keys(payload.scores || {});
@@ -1263,57 +1264,99 @@ function ShareResults({ payload, results, dream }) {
     return { you, low, high, outOf, pct, margin: dream.probability.margin };
   }, [dream]);
 
-  const getImageFile = useCallback(async () => {
+  const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
+
+  /** Convert data-URL to Blob for Web Share API */
+  const imageUrlToBlob = useCallback(async () => {
     if (!imageUrl) return null;
-    try {
-      const r = await fetch(imageUrl);
-      const b = await r.blob();
-      return new File([b], `DreamSeat-${firstName}-Results.png`, { type: 'image/png' });
-    } catch { return null; }
-  }, [imageUrl, firstName]);
-
-const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare;
-
+    try { const r = await fetch(imageUrl); return r.blob(); }
+    catch { return null; }
+  }, [imageUrl]);
 
   const shareWithImage = useCallback(async (text) => {
-    const file = await getImageFile();
-    if (file && canShareFiles) {
-      const data = { files: [file], text, title: 'My DreamSeat Results' };
-      try { if (navigator.canShare(data)) { await navigator.share(data); return true; } } catch (e) { if (e.name !== 'AbortError') console.warn(e); }
+    if (typeof navigator === 'undefined' || !navigator.share) return false;
+    const blob = await imageUrlToBlob();
+    if (!blob) return false;
+    try {
+      await navigator.share({
+        title: 'My DreamSeat Results',
+        text,
+        files: [new File([blob], 'DreamSeat-Results.png', { type: 'image/png' })],
+      });
+      setShareMsg('Shared!');
+      return true;
+    } catch (e) {
+      if (e.name !== 'AbortError') console.warn('Share failed:', e);
+      return false;
     }
-    return false;
-  }, [getImageFile, canShareFiles]);
+  }, [imageUrl, imageUrlToBlob]);
 
   const generateImage = useCallback(async () => {
     if (!cardRef.current) return;
     setGenerating(true);
+    setGenError(null);
     try {
-      const html2canvas = (await import('html2canvas')).default;
+      const { default: html2canvas } = await import('html2canvas');
       const canvas = await html2canvas(cardRef.current, {
-        scale: 3,
+        scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
         logging: false,
       });
       setImageUrl(canvas.toDataURL('image/png'));
-    } catch (e) { console.error('Share card generation failed:', e); }
-    setGenerating(false);
+    } catch (e) {
+      console.error('Share card generation failed:', e);
+      setGenError('Failed to generate image. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
   }, []);
+
+  const downloadImage = useCallback(() => {
+    if (!imageUrl) return;
+    const a = document.createElement('a');
+    a.href = imageUrl;
+    a.download = 'DreamSeat-Results.png';
+    a.click();
+    setShareMsg('Image saved!');
+  }, [imageUrl]);
+
+  const copyLink = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) {
+      setShareMsg('Copy not supported');
+      return;
+    }
+    navigator.clipboard.writeText('https://dreamseat.vercel.app')
+      .then(() => setShareMsg('Link copied!'))
+      .catch(() => setShareMsg('Failed to copy'));
+  }, []);
+
+  const openModal = () => {
+    setShowModal(true);
+    setImageUrl(null);
+    setGenError(null);
+    setShareMsg('');
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setGenerating(false);
+    document.body.style.overflow = '';
+  };
+
+  useEffect(() => {
+    if (!shareMsg) return;
+    const t = setTimeout(() => setShareMsg(''), 3000);
+    return () => clearTimeout(t);
+  }, [shareMsg]);
 
   useEffect(() => {
     if (showModal) {
       document.body.style.overflow = 'hidden';
-      setImageUrl(null);
-      const t = setTimeout(generateImage, 300);
+      const t = setTimeout(generateImage, 200);
       return () => { document.body.style.overflow = ''; clearTimeout(t); };
     }
   }, [showModal, generateImage]);
-
-  const downloadImage = () => {
-    if (!imageUrl) return;
-    const a = document.createElement('a');
-    a.href = imageUrl; a.download = `DreamSeat-${firstName}-Results.png`; a.click();
-  };
 
   if (!dream) {
     return (
@@ -1329,8 +1372,8 @@ const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !
   const dreamVerdict = dream.probability?.verdict;
   const catSeats = dream.seats?.[category];
 
-  const shareText = `I just checked my DU admission chances on DreamSeat \u2014 ${dreamP}% for ${dreamCollege}! Check yours free: https://dreamseat.vercel.app`;
-  const tweetText = `Just checked my DU 2026 admission chances \u2014 ${dreamP}% for ${dreamCollege}! \uD83C\uDFAF\n\nCheck yours free \uD83D\uDC47\nhttps://dreamseat.vercel.app`;
+  const shareText = `I just checked my DU admission chances on DreamSeat — ${dreamP}% for ${dreamCollege}! Check yours free: https://dreamseat.vercel.app`;
+  const tweetText = `Just checked my DU 2026 admission chances — ${dreamP}% for ${dreamCollege}! \uD83C\uDFAF\n\nCheck yours free \uD83D\uDC47\nhttps://dreamseat.vercel.app`;
 
   const vBadge = (tone) => {
     const map = {
@@ -1349,51 +1392,42 @@ const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !
     <>
       <div className="text-center">
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openModal}
           className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white font-bold text-sm hover:from-indigo-700 hover:via-violet-700 hover:to-purple-700 transition-all shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.02] active:scale-[0.98]"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
-          Share My Results &#x2728;
+          Share My Results ✨
         </button>
         <p className="mt-2 text-[11px] text-slate-400">Get a shareable card for WhatsApp, Instagram &amp; Twitter</p>
       </div>
 
       {showModal && createPortal(
         <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 999999,
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-            padding: '20px 12px', overflowY: 'auto',
-            background: 'rgba(15, 23, 42, 0.7)',
-            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+          style={{ position: 'fixed', inset: 0, zIndex: 999999, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 12px', overflowY: 'auto', background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div style={{
-            width: '100%', maxWidth: '500px', marginTop: '40px',
-            background: '#fff', borderRadius: '20px',
-            boxShadow: '0 25px 60px -12px rgba(0,0,0,0.4)',
-            display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          }}>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          <div style={{ width: '100%', maxWidth: '500px', marginTop: '40px', background: '#fff', borderRadius: '20px', boxShadow: '0 25px 60px -12px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+            {/* ── Header ── */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
               <span style={{ fontWeight: 600, fontSize: '15px', color: '#0f172a' }}>Share your results</span>
-              <button onClick={() => setShowModal(false)} style={{ height: '28px', width: '28px', display: 'grid', placeItems: 'center', borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#64748b' }}>&times;</button>
+              <button onClick={closeModal} style={{ height: '28px', width: '28px', display: 'grid', placeItems: 'center', borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#64748b' }}>&times;</button>
             </div>
 
+            {/* ── Toast ── */}
+            {shareMsg && (
+              <div style={{ padding: '8px 20px', background: '#ecfdf5', borderBottom: '1px solid #a7f3d0', fontSize: '13px', color: '#065f46', fontWeight: 600, textAlign: 'center' }}>
+                ✓ {shareMsg}
+              </div>
+            )}
+
+            {/* ── Card preview (scrollable on small screens) ── */}
             <div style={{ padding: '16px', background: '#f8fafc', overflowX: 'auto' }}>
-              <div ref={cardRef} style={{
-                width: '460px', margin: '0 auto',
-                background: '#ffffff',
-                borderRadius: '20px',
-                border: '1px solid #e2e8f0',
-                padding: '28px 26px',
-                fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
-                color: '#0f172a',
-                boxSizing: 'border-box',
-              }}>
+              <div ref={cardRef} style={{ width: '460px', margin: '0 auto', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '28px 26px', fontFamily: "'Inter', system-ui, sans-serif", color: '#0f172a', boxSizing: 'border-box' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                   <div style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif", fontStyle: 'italic', fontSize: '26px', letterSpacing: '-0.01em', lineHeight: 1 }}>
                     <span style={{ color: '#312e81' }}>Dream</span><span style={{ color: '#4f46e5' }}>Seat</span>
@@ -1403,22 +1437,9 @@ const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !
 
                 <div style={{ marginBottom: '22px' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
-                  <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{firstName}</div>
+                  <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{name}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                    <span style={{
-                      display: 'inline-grid',
-                      placeItems: 'center',
-                      height: '24px',
-                      padding: '0 14px',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      borderRadius: '20px',
-                      background: '#e0e7ff',
-                      color: '#3730a3',
-                      border: '1px solid #c7d2fe',
-                      letterSpacing: '0.04em',
-                      lineHeight: 1,
-                    }}>
+                    <span style={{ display: 'inline-grid', placeItems: 'center', height: '24px', padding: '0 14px', fontSize: '10px', fontWeight: 700, borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', letterSpacing: '0.04em', lineHeight: 1 }}>
                       <span style={{ display: 'block', transform: 'translateY(-1px)' }}>{category}</span>
                     </span>
                     <span style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>{results.length.toLocaleString()} eligible programs</span>
@@ -1428,108 +1449,25 @@ const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginBottom: '18px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '5px' }}>&#x2605; DREAM COLLEGE</div>
+                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '5px' }}>★ DREAM COLLEGE</div>
                       <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
                       <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', lineHeight: 1.3 }}>{dreamProgram}</div>
                     </div>
-                    <div style={{
-                      display: 'inline-grid',
-                      gridAutoFlow: 'column',
-                      gap: '5px',
-                      placeItems: 'center',
-                      height: '26px',
-                      padding: '0 12px',
-                      flexShrink: 0,
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      borderRadius: '20px',
-                      background: vBadge(dreamVerdict?.tone).bg,
-                      color: vBadge(dreamVerdict?.tone).color,
-                      border: `1px solid ${vBadge(dreamVerdict?.tone).border}`,
-                      whiteSpace: 'nowrap',
-                      lineHeight: 1,
-                    }}>
+                    <div style={{ display: 'inline-grid', gridAutoFlow: 'column', gap: '5px', placeItems: 'center', height: '26px', padding: '0 12px', flexShrink: 0, fontSize: '10px', fontWeight: 700, borderRadius: '20px', background: vBadge(dreamVerdict?.tone).bg, color: vBadge(dreamVerdict?.tone).color, border: `1px solid ${vBadge(dreamVerdict?.tone).border}`, whiteSpace: 'nowrap', lineHeight: 1 }}>
                       <span style={{ transform: 'translateY(-0.5px)' }}>{dreamVerdict?.emoji}</span>
                       <span style={{ transform: 'translateY(-1px)' }}>{dreamVerdict?.label}</span>
                     </div>
                   </div>
 
-                  <div style={{
-                    position: 'relative',
-                    background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%)',
-                    borderRadius: '14px',
-                    marginBottom: '14px',
-                    padding: '24px 20px 22px',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 20px -8px rgba(124, 58, 237, 0.5)',
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '-30px',
-                      right: '-30px',
-                      width: '120px',
-                      height: '120px',
-                      borderRadius: '50%',
-                      background: 'rgba(255,255,255,0.08)',
-                    }} />
-
+                  <div style={{ position: 'relative', background: 'linear-gradient(135deg,#6366f1 0%,#7c3aed 50%,#8b5cf6 100%)', borderRadius: '14px', marginBottom: '14px', padding: '24px 20px 22px', overflow: 'hidden', boxShadow: '0 8px 20px -8px rgba(124,58,237,0.5)' }}>
+                    <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
                     <div style={{ position: 'relative', textAlign: 'center' }}>
-                      <div style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        letterSpacing: '0.18em',
-                        textTransform: 'uppercase',
-                        color: 'rgba(255,255,255,0.8)',
-                        marginBottom: '8px',
-                      }}>
-                        Admission Chance
+                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.8)', marginBottom: '8px' }}>Admission Chance</div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', fontFamily: "'Inter', system-ui, sans-serif", color: '#ffffff', lineHeight: 1, letterSpacing: '-0.04em', marginTop: '8px', marginBottom: '24px' }}>
+                        <span style={{ fontSize: '68px', fontWeight: 800, lineHeight: 1, transform: 'translateY(7px)', display: 'inline-block' }}>{dreamP}</span>
+                        <span style={{ fontSize: '36px', fontWeight: 700, lineHeight: 1, marginLeft: '4px', transform: 'translateY(-7px)', display: 'inline-block' }}>%</span>
                       </div>
-
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        justifyContent: 'center',
-                        fontFamily: "'Inter', system-ui, sans-serif",
-                        color: '#ffffff',
-                        lineHeight: 1,
-                        letterSpacing: '-0.04em',
-                        marginTop: '8px',
-                        marginBottom: '24px',
-                      }}>
-                        <span style={{
-                          fontSize: '68px',
-                          fontWeight: 800,
-                          lineHeight: 1,
-                          transform: 'translateY(7px)',
-                          display: 'inline-block',
-                        }}>{dreamP}</span>
-                        <span style={{
-                          fontSize: '36px',
-                          fontWeight: 700,
-                          lineHeight: 1,
-                          marginLeft: '4px',
-                          transform: 'translateY(-7px)',
-                          display: 'inline-block',
-                        }}>%</span>
-                      </div>
-
-                      <div style={{
-                        display: 'inline-grid',
-                        gridAutoFlow: 'column',
-                        gap: '6px',
-                        placeItems: 'center',
-                        height: '28px',
-                        padding: '0 14px',
-                        background: 'rgba(255,255,255,0.18)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                        borderRadius: '20px',
-                        backdropFilter: 'blur(4px)',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        color: '#ffffff',
-                        letterSpacing: '0.02em',
-                        lineHeight: 1,
-                      }}>
+                      <div style={{ display: 'inline-grid', gridAutoFlow: 'column', gap: '6px', placeItems: 'center', height: '28px', padding: '0 14px', background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: '20px', fontSize: '12px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.02em', lineHeight: 1 }}>
                         <span style={{ transform: 'translateY(-0.5px)' }}>{dreamVerdict?.emoji}</span>
                         <span style={{ transform: 'translateY(-1px)' }}>{dreamVerdict?.label}</span>
                       </div>
@@ -1551,11 +1489,11 @@ const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !
                     <div style={{ marginBottom: '12px' }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px' }}>SCORE POSITION vs CUTOFF</div>
                       <div style={{ position: 'relative', height: '12px', borderRadius: '6px', background: '#e2e8f0' }}>
-                        <div style={{ position: 'absolute', top: '1px', bottom: '1px', left: dreamPos.pct(dreamPos.low) + '%', width: Math.max(3, dreamPos.pct(dreamPos.high) - dreamPos.pct(dreamPos.low)) + '%', borderRadius: '5px', background: 'linear-gradient(90deg, #fbbf24, #f59e0b)' }} />
-                        <div style={{ position: 'absolute', top: '50%', left: dreamPos.pct(dreamPos.you) + '%', transform: 'translate(-50%, -50%)', width: '16px', height: '16px', borderRadius: '50%', background: '#10b981', border: '3px solid #fff', boxShadow: '0 0 0 1px #10b981' }} />
+                        <div style={{ position: 'absolute', top: '1px', bottom: '1px', left: dreamPos.pct(dreamPos.low) + '%', width: Math.max(3, dreamPos.pct(dreamPos.high) - dreamPos.pct(dreamPos.low)) + '%', borderRadius: '5px', background: 'linear-gradient(90deg,#fbbf24,#f59e0b)' }} />
+                        <div style={{ position: 'absolute', top: '50%', left: dreamPos.pct(dreamPos.you) + '%', transform: 'translate(-50%,-50%)', width: '16px', height: '16px', borderRadius: '50%', background: '#10b981', border: '3px solid #fff', boxShadow: '0 0 0 1px #10b981' }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                        <span style={{ fontSize: '10px', color: '#d97706', fontWeight: 700 }}>Cutoff: {Math.round(dreamPos.low)}{'\u2013'}{Math.round(dreamPos.high)}</span>
+                        <span style={{ fontSize: '10px', color: '#d97706', fontWeight: 700 }}>Cutoff: {Math.round(dreamPos.low)}\u2013{Math.round(dreamPos.high)}</span>
                         <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>You: {dreamPos.you.toFixed(1)}</span>
                       </div>
                     </div>
@@ -1594,95 +1532,63 @@ const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !
               </div>
             </div>
 
-            {/* ═══════ PROFESSIONAL SHARE BUTTONS ═══════ */}
+            {/* ── Action area ── */}
             <div style={{ padding: '16px 20px 18px', borderTop: '1px solid #f1f5f9', background: '#fff' }}>
               {generating ? (
                 <div style={{ textAlign: 'center', fontSize: '13px', color: '#64748b', padding: '14px 0' }}>
                   <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', marginRight: '8px', verticalAlign: 'middle', animation: 'spin 0.7s linear infinite' }} />
-                  Generating your card...
+                  Generating your card…
                 </div>
-              ) : (
+              ) : genError ? (
+                <div style={{ textAlign: 'center', padding: '14px 0' }}>
+                  <div style={{ fontSize: '13px', color: '#dc2626', marginBottom: '10px' }}>{genError}</div>
+                  <button onClick={generateImage} style={{ fontSize: '13px', fontWeight: 600, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Try again</button>
+                </div>
+              ) : imageUrl ? (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '10px' }}>
-                    <ProShareBtn
-                      label="WhatsApp"
-                      bg="#ffffff"
-                      hoverBg="#f8fafc"
-                      textColor="#0f172a"
-                      border="1px solid #e2e8f0"
-                      iconColor="#25D366"
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '10px' }}>
+                    {isMobile && (
+                      <ShareBtn label="Share" iconColor="#6366f1"
+                        icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>}
+                        onClick={() => shareWithImage(shareText)} />
+                    )}
+                    <ShareBtn label="WhatsApp" iconColor="#25D366"
                       icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>}
-                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank'); }}
-                      disabled={!imageUrl}
-                    />
-                    <ProShareBtn
-                      label="Instagram"
-                      bg="#ffffff"
-                      hoverBg="#f8fafc"
-                      textColor="#0f172a"
-                      border="1px solid #e2e8f0"
-                      iconColor="#E1306C"
-                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/></svg>}
-                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) downloadImage(); }}
-                      disabled={!imageUrl}
-                    />
-                    <ProShareBtn
-                      label="Telegram"
-                      bg="#ffffff"
-                      hoverBg="#f8fafc"
-                      textColor="#0f172a"
-                      border="1px solid #e2e8f0"
-                      iconColor="#0088cc"
-                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>}
-                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://t.me/share/url?url=https://dreamseat.vercel.app&text=' + encodeURIComponent(shareText), '_blank'); }}
-                      disabled={!imageUrl}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                    <ProShareBtn
-                      label="Twitter"
-                      bg="#ffffff"
-                      hoverBg="#f8fafc"
-                      textColor="#0f172a"
-                      border="1px solid #e2e8f0"
-                      iconColor="#0f172a"
+                      onClick={() => shareWithImage(shareText).then(ok => { if (!ok) window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank'); })} />
+                    <ShareBtn label="Twitter / X" iconColor="#0f172a"
                       icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>}
-                      onClick={async () => { const ok = await shareWithImage(tweetText); if (!ok) window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweetText), '_blank'); }}
-                      disabled={!imageUrl}
-                    />
-                    <ProShareBtn
-                      label="Reddit"
-                      bg="#ffffff"
-                      hoverBg="#f8fafc"
-                      textColor="#0f172a"
-                      border="1px solid #e2e8f0"
-                      iconColor="#FF4500"
+                      onClick={() => window.open('https://x.com/intent/tweet?text=' + encodeURIComponent(tweetText), '_blank')} />
+                    <ShareBtn label="Telegram" iconColor="#0088cc"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>}
+                      onClick={() => window.open('https://t.me/share/url?url=https://dreamseat.vercel.app&text=' + encodeURIComponent(shareText), '_blank')} />
+                    <ShareBtn label="Reddit" iconColor="#FF4500"
                       icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>}
-                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://reddit.com/submit?url=https://dreamseat.vercel.app&title=' + encodeURIComponent(shareText), '_blank'); }}
-                      disabled={!imageUrl}
-                    />
-                    <ProShareBtn
-                      label="Save"
-                      bg="#0f172a"
-                      hoverBg="#1e293b"
-                      textColor="#ffffff"
-                      border="1px solid #0f172a"
-                      iconColor="#ffffff"
+                      onClick={() => window.open('https://reddit.com/submit?url=https://dreamseat.vercel.app&title=' + encodeURIComponent(shareText), '_blank')} />
+                    <ShareBtn label="Copy Link" iconColor="#4f46e5"
+                      icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
+                      onClick={copyLink} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <ShareBtn label="Save Image" iconColor="#0f172a" filled
                       icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}
-                      onClick={downloadImage}
-                      disabled={!imageUrl}
-                    />
+                      onClick={downloadImage} />
+                    <ShareBtn label="Screenshot" iconColor="#6366f1"
+                      icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>}
+                      onClick={() => setShareMsg('Scroll the card to capture everything you want to share')} />
                   </div>
                   <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '12px', lineHeight: 1.5 }}>
-                    On mobile: image auto-attaches to your message
-                    <br />
-                    On desktop: save image first, then attach when sharing
+                    {isMobile
+                      ? 'Tap Share to send the image to any app, or use WhatsApp / Telegram directly.'
+                      : 'Save the image, then attach it when sharing. Or use a direct link button.'}
                   </p>
                 </>
+              ) : (
+                <div style={{ textAlign: 'center', fontSize: '13px', color: '#94a3b8', padding: '14px 0' }}>
+                  Waiting to generate card…
+                </div>
               )}
             </div>
           </div>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>,
         document.body
       )}
@@ -1690,7 +1596,7 @@ const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !
   );
 }
 
-/* Helper components for share card */
+/* ── StatBox for the share card ── */
 function StatBox({ label, value, sub }) {
   return (
     <div style={{ flex: 1, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 8px', textAlign: 'center', minWidth: 0 }}>
@@ -1701,33 +1607,24 @@ function StatBox({ label, value, sub }) {
   );
 }
 
-/* Professional share button — clean monochrome with brand-colored icons */
-function ProShareBtn({ label, bg, hoverBg, textColor, border, iconColor, icon, onClick, disabled }) {
+/* ── Clean share button ── */
+function ShareBtn({ label, iconColor, icon, onClick, filled }) {
   const [hover, setHover] = useState(false);
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-        padding: '11px 8px',
-        borderRadius: '10px',
-        border: border || 'none',
-        background: hover && !disabled ? hoverBg : bg,
-        color: textColor || '#fff',
-        fontSize: '13px',
-        fontWeight: 600,
-        letterSpacing: '-0.005em',
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+        padding: '10px 6px', borderRadius: '10px',
+        border: filled ? 'none' : '1px solid #e2e8f0',
+        background: filled ? (hover ? '#1e293b' : '#0f172a') : (hover ? '#f8fafc' : '#ffffff'),
+        color: filled ? '#ffffff' : '#0f172a',
+        fontSize: '13px', fontWeight: 600, cursor: 'pointer',
         transition: 'all 0.15s ease',
-        boxShadow: disabled ? 'none' : (hover ? '0 2px 8px -2px rgba(15,23,42,0.12)' : '0 1px 2px rgba(15,23,42,0.05)'),
-        transform: hover && !disabled ? 'translateY(-1px)' : 'translateY(0)',
+        boxShadow: hover ? '0 2px 8px -2px rgba(15,23,42,0.12)' : '0 1px 2px rgba(15,23,42,0.05)',
+        transform: hover ? 'translateY(-1px)' : 'none',
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
