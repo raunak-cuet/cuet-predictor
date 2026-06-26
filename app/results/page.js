@@ -1326,6 +1326,10 @@ function ImportantDisclaimer() {
    SHARE RESULTS — Viral shareable card (dark premium design)
    All styles are inline so html2canvas captures pixel-perfect.
    ============================================================ */
+/* ============================================================
+   SHARE RESULTS — Light-themed shareable card matching website design.
+   All card content uses inline styles for pixel-perfect html2canvas output.
+   ============================================================ */
 function ShareResults({ payload, results, dream }) {
   const [showModal, setShowModal] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -1335,10 +1339,8 @@ function ShareResults({ payload, results, dream }) {
   const name = payload.name || 'Student';
   const category = payload.category || 'UR';
   const firstName = name.split(' ')[0];
-  const top3 = useMemo(() => results.slice(0, 3), [results]);
-  const safeCount = useMemo(() => results.filter(r => (r.probability.p ?? 0) >= 75).length, [results]);
 
-  // Subject scores for the NTA bar chart
+  // Subject scores for bar chart
   const subjectBars = useMemo(() => {
     const codes = payload.subjectsTaken || Object.keys(payload.scores || {});
     return codes.map(code => {
@@ -1351,7 +1353,7 @@ function ShareResults({ payload, results, dream }) {
     }).sort((a, b) => b.score - a.score);
   }, [payload]);
 
-  // Dream college score positioning data
+  // Score positioning
   const dreamPos = useMemo(() => {
     if (!dream) return null;
     const proj = dream.projection;
@@ -1359,102 +1361,80 @@ function ShareResults({ payload, results, dream }) {
     const low = proj.conservative;
     const high = proj.aggressive;
     const outOf = dream.outOf;
-    const dispMin = Math.min(low - 40, you - 60);
+    const dispMin = Math.min(low - 50, you - 70);
     const dispMax = outOf;
     const range = dispMax - dispMin;
     const pct = (v) => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
     return { you, low, high, outOf, pct, margin: dream.probability.margin };
   }, [dream]);
 
+  // Image helpers
+  const getImageFile = useCallback(async () => {
+    if (!imageUrl) return null;
+    try {
+      const r = await fetch(imageUrl);
+      const b = await r.blob();
+      return new File([b], `DreamSeat-${firstName}-Results.png`, { type: 'image/png' });
+    } catch { return null; }
+  }, [imageUrl, firstName]);
+
+  const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare;
+
+  const shareWithImage = useCallback(async (text) => {
+    const file = await getImageFile();
+    if (file && canShareFiles) {
+      const data = { files: [file], text, title: 'My DreamSeat Results' };
+      try { if (navigator.canShare(data)) { await navigator.share(data); return true; } } catch (e) { if (e.name !== 'AbortError') console.warn(e); }
+    }
+    return false;
+  }, [getImageFile, canShareFiles]);
+
   const generateImage = useCallback(async () => {
     if (!cardRef.current) return;
     setGenerating(true);
     try {
       const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(cardRef.current, {
-        scale: 3,
-        backgroundColor: '#0f172a',
-        useCORS: true,
-        logging: false,
-      });
-      const url = canvas.toDataURL('image/png');
-      setImageUrl(url);
-    } catch (e) {
-      console.error('Share card generation failed:', e);
-    }
+      const canvas = await html2canvas(cardRef.current, { scale: 3, backgroundColor: '#f8f9fc', useCORS: true, logging: false });
+      setImageUrl(canvas.toDataURL('image/png'));
+    } catch (e) { console.error('Share card generation failed:', e); }
     setGenerating(false);
   }, []);
 
   useEffect(() => {
-    if (showModal) {
-      setImageUrl(null);
-      const t = setTimeout(generateImage, 300);
-      return () => clearTimeout(t);
-    }
+    if (showModal) { setImageUrl(null); const t = setTimeout(generateImage, 300); return () => clearTimeout(t); }
   }, [showModal, generateImage]);
-
-  // Helper: convert imageUrl to a shareable File object
-  const getImageFile = useCallback(async () => {
-    if (!imageUrl) return null;
-    try {
-      const res = await fetch(imageUrl);
-      const blob = await res.blob();
-      return new File([blob], `DreamSeat-${firstName}-Results.png`, { type: 'image/png' });
-    } catch { return null; }
-  }, [imageUrl, firstName]);
-
-  // Helper: can this browser share files?
-  const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare;
-
-  // Share with image via Web Share API (works on mobile WhatsApp, Instagram, etc.)
-  const shareWithImage = useCallback(async (text) => {
-    const file = await getImageFile();
-    if (file && canShareFiles) {
-      const shareData = { files: [file], text, title: 'My DreamSeat Results' };
-      try {
-        if (navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-          return true;
-        }
-      } catch (e) {
-        if (e.name !== 'AbortError') console.warn('Share failed:', e);
-        return false;
-      }
-    }
-    return false;
-  }, [getImageFile, canShareFiles]);
 
   const downloadImage = () => {
     if (!imageUrl) return;
     const a = document.createElement('a');
-    a.href = imageUrl;
-    a.download = `DreamSeat-${firstName}-Results.png`;
-    a.click();
+    a.href = imageUrl; a.download = `DreamSeat-${firstName}-Results.png`; a.click();
   };
 
   const dreamP = dream?.probability?.p ?? 0;
   const dreamEmoji = dream?.probability?.verdict?.emoji || '';
   const dreamCollege = dream?.college || '';
   const dreamProgram = dream?.program || '';
+  const catSeats = dream?.seats?.[category];
 
-  const whatsappText = dream
-    ? `I just checked my DU admission chances on DreamSeat — ${Math.round(dreamP)}% for ${dreamCollege} ${dreamProgram}! Check yours free: https://dreamseat.vercel.app`
-    : `I just checked my DU admission chances on DreamSeat — ${safeCount} safe programs! Check yours free: https://dreamseat.vercel.app`;
+  const shareText = dream
+    ? `I just checked my DU admission chances on DreamSeat \u2014 ${Math.round(dreamP)}% for ${dreamCollege} ${dreamProgram}! Check yours free: https://dreamseat.vercel.app`
+    : `I just checked my DU admission chances on DreamSeat! Check yours free: https://dreamseat.vercel.app`;
 
-  const twitterText = dream
-    ? `Just checked my DU 2026 admission chances — ${Math.round(dreamP)}% for ${dreamCollege}! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`
-    : `Just checked my DU 2026 admission chances — ${safeCount} safe programs! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`;
+  const tweetText = dream
+    ? `Just checked my DU 2026 admission chances \u2014 ${Math.round(dreamP)}% for ${dreamCollege}! \ud83c\udfaf\n\nCheck yours free \ud83d\udc47\nhttps://dreamseat.vercel.app`
+    : `Just checked my DU 2026 admission chances on DreamSeat! \ud83c\udfaf\nhttps://dreamseat.vercel.app`;
 
-  const vc = (tone) => ({ safe:'#34d399', good:'#60a5fa', mid:'#fbbf24', risk:'#fb923c', reach:'#f87171' }[tone] || '#94a3b8');
+  // ── Color helpers ──
+  const probGrad = 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 40%, #4f46e5 100%)';
+  const barColor = (pct) => pct >= 90 ? '#10b981' : pct >= 80 ? '#3b82f6' : pct >= 70 ? '#f59e0b' : '#fb923c';
 
-  // ── Shared inline style objects (html2canvas-safe) ──
-  const S = {
-    card: { width:'480px', maxWidth:'100%', margin:'0 auto', background:'#0f172a', borderRadius:'24px', padding:'32px 28px', fontFamily:"'Inter',system-ui,sans-serif", color:'#fff', position:'relative', overflow:'hidden', boxSizing:'border-box' },
-    orb1: { position:'absolute', top:'-60px', right:'-60px', width:'200px', height:'200px', borderRadius:'50%', background:'radial-gradient(circle,rgba(139,92,246,0.25),transparent 70%)', pointerEvents:'none' },
-    orb2: { position:'absolute', bottom:'-40px', left:'-40px', width:'160px', height:'160px', borderRadius:'50%', background:'radial-gradient(circle,rgba(6,182,212,0.18),transparent 70%)', pointerEvents:'none' },
-    label: { fontSize:'9px', letterSpacing:'0.16em', textTransform:'uppercase', fontWeight:700 },
-    sectionBg: { background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'14px', padding:'16px', marginBottom:'16px', position:'relative' },
-  };
+  if (!dream) {
+    return (
+      <div className="text-center">
+        <p className="text-xs text-slate-400">Select a dream college to unlock the shareable results card.</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1463,243 +1443,166 @@ function ShareResults({ payload, results, dream }) {
         <button onClick={() => setShowModal(true)}
           className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white font-bold text-sm hover:from-violet-700 hover:via-purple-700 hover:to-fuchsia-700 transition-all shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98]">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          Share My Results ✨
+          Share My Results &#x2728;
         </button>
         <p className="mt-2 text-[11px] text-slate-400">Get a shareable card for WhatsApp, Instagram &amp; Twitter</p>
       </div>
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 bg-black/70 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+        <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-8 pb-4 px-3 overflow-y-auto bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
               <h3 className="font-semibold text-slate-900 text-sm">Share your results</h3>
-              <button onClick={() => setShowModal(false)} className="h-7 w-7 grid place-items-center rounded-full hover:bg-slate-100 text-slate-500 text-sm">✕</button>
+              <button onClick={() => setShowModal(false)} className="h-7 w-7 grid place-items-center rounded-full hover:bg-slate-100 text-slate-500 text-sm">&times;</button>
             </div>
 
-            {/* Scrollable card preview */}
-            <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
-              {/* ═══ THE CARD (captured by html2canvas) ═══ */}
-              <div ref={cardRef} style={S.card}>
-                <div style={S.orb1} />
-                <div style={S.orb2} />
+            {/* Card preview */}
+            <div className="p-4 bg-slate-50 overflow-x-auto">
+              {/* ═══════════ THE CARD ═══════════ */}
+              <div ref={cardRef} style={{ width:'460px', margin:'0 auto', background:'#f8f9fc', borderRadius:'22px', padding:'32px 28px', fontFamily:"'Inter','Segoe UI',system-ui,sans-serif", color:'#1e293b', boxSizing:'border-box' }}>
 
-                {/* Header: Logo + CUET 2026 */}
-                <div style={{ position:'relative', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px' }}>
-                  <div style={{ fontSize:'22px', fontWeight:800, letterSpacing:'-0.01em' }}>
-                    <span style={{ color:'#f0abcb' }}>Dream</span><span style={{ color:'#d4a574' }}>Seat</span>
+                {/* Logo row */}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'22px' }}>
+                  <div style={{ fontSize:'24px', fontStyle:'italic', fontWeight:700, letterSpacing:'-0.01em' }}>
+                    <span style={{ color:'#e879a0' }}>Dream</span><span style={{ color:'#b8860b' }}>Seat</span>
                   </div>
-                  <span style={{ ...S.label, color:'rgba(255,255,255,0.35)', fontSize:'10px' }}>CUET 2026</span>
+                  <span style={{ fontSize:'11px', letterSpacing:'0.14em', textTransform:'uppercase', color:'#94a3b8', fontWeight:700 }}>CUET 2026</span>
                 </div>
 
-                {/* Name + category */}
-                <div style={{ position:'relative', marginBottom:'24px' }}>
-                  <div style={{ ...S.label, color:'rgba(255,255,255,0.4)', marginBottom:'4px' }}>Predictions for</div>
-                  <div style={{ fontSize:'34px', fontWeight:800, lineHeight:1.1 }}>{firstName}</div>
-                  <div style={{ display:'flex', alignItems:'center', gap:'8px', marginTop:'10px' }}>
-                    <span style={{ fontSize:'10px', fontWeight:700, padding:'4px 12px', borderRadius:'20px', background:'rgba(99,102,241,0.2)', color:'#a5b4fc', border:'1px solid rgba(99,102,241,0.25)' }}>{category}</span>
-                    <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.45)' }}>{results.length} eligible programs</span>
+                {/* Name row */}
+                <div style={{ marginBottom:'24px' }}>
+                  <div style={{ fontSize:'11px', letterSpacing:'0.16em', textTransform:'uppercase', color:'#94a3b8', fontWeight:600, marginBottom:'4px' }}>PREDICTIONS FOR</div>
+                  <div style={{ fontSize:'38px', fontWeight:800, lineHeight:1.1, color:'#0f172a' }}>{firstName}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'8px', marginTop:'8px' }}>
+                    <span style={{ fontSize:'11px', fontWeight:700, padding:'4px 14px', borderRadius:'20px', background:'#e0e7ff', color:'#4338ca' }}>{category}</span>
+                    <span style={{ fontSize:'12px', color:'#94a3b8' }}>{results.length.toLocaleString()} eligible programs</span>
                   </div>
                 </div>
 
-                {/* ─── Dream college block ─── */}
-                {dream && (
-                  <div style={{ ...S.sectionBg, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.18)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px' }}>
-                      <div style={{ ...S.label, color:'#fbbf24' }}>★ DREAM COLLEGE</div>
-                      <span style={{ fontSize:'10px', fontWeight:700, padding:'3px 10px', borderRadius:'20px', background:'rgba(255,255,255,0.08)', color: vc(dream.probability?.verdict?.tone), border:`1px solid ${vc(dream.probability?.verdict?.tone)}33` }}>
-                        {dreamEmoji} {dream.probability?.verdict?.label}
-                      </span>
-                    </div>
-                    <div style={{ fontSize:'15px', fontWeight:700, color:'#fff', lineHeight:1.35 }}>{dreamCollege}</div>
-                    <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.55)', marginTop:'3px' }}>{dreamProgram}</div>
+                {/* ── Dream college card ── */}
+                <div style={{ border:'1.5px solid #e2e8f0', borderRadius:'16px', padding:'20px', marginBottom:'20px', background:'#ffffff' }}>
 
-                    {/* Big probability */}
-                    <div style={{ textAlign:'center', margin:'16px 0 12px', padding:'16px', borderRadius:'14px', background:'linear-gradient(135deg,#7c3aed,#6d28d9,#4f46e5)' }}>
-                      <div style={{ ...S.label, color:'rgba(255,255,255,0.7)', marginBottom:'4px', fontSize:'10px' }}>ADMISSION CHANCE</div>
-                      <div style={{ fontSize:'48px', fontWeight:800, lineHeight:1 }}>~{Math.round(dreamP)}%</div>
-                    </div>
+                  {/* Header */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'10px' }}>
+                    <div style={{ fontSize:'10px', letterSpacing:'0.14em', textTransform:'uppercase', color:'#d97706', fontWeight:700 }}>&#x2605; DREAM COLLEGE</div>
+                    <span style={{ fontSize:'11px', fontWeight:700, padding:'4px 12px', borderRadius:'20px', background:'#d1fae5', color:'#065f46', border:'1px solid #a7f3d0' }}>{dreamEmoji} {dream.probability?.verdict?.label}</span>
+                  </div>
+                  <div style={{ fontSize:'18px', fontWeight:800, color:'#0f172a', lineHeight:1.3 }}>{dreamCollege}</div>
+                  <div style={{ fontSize:'12px', color:'#64748b', marginTop:'3px' }}>{dreamProgram}</div>
 
-                    {/* 2x2 stats grid */}
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'12px' }}>
-                      {[
-                        { lbl:'YOUR COMPOSITE', val: dream.yourComposite?.toFixed(1), sub:`out of ${dream.outOf}` },
-                        { lbl:'EST. 2026 CUTOFF', val: Math.round(dream.projection.mostLikely), sub:`±${Math.round(dream.projection.sigma)}` },
-                        { lbl:'2025 CUTOFF', val: dream.cutoff2025 != null ? Math.round(dream.cutoff2025) : '—', sub:`Rd 1 · ${category}` },
-                        { lbl:`${category} SEATS`, val: dream.seats?.[category] ?? '—', sub:'this category' },
-                      ].map((s, i) => (
-                        <div key={i} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'10px', padding:'10px', textAlign:'center' }}>
-                          <div style={{ ...S.label, color:'rgba(255,255,255,0.45)', fontSize:'8px', marginBottom:'4px' }}>{s.lbl}</div>
-                          <div style={{ fontSize:'22px', fontWeight:800, lineHeight:1 }}>{s.val}</div>
-                          <div style={{ fontSize:'10px', color:'rgba(255,255,255,0.4)', marginTop:'2px' }}>{s.sub}</div>
-                        </div>
-                      ))}
-                    </div>
+                  {/* Probability block */}
+                  <div style={{ textAlign:'center', margin:'16px 0', padding:'18px 16px', borderRadius:'14px', background:probGrad, color:'#fff' }}>
+                    <div style={{ fontSize:'10px', letterSpacing:'0.16em', textTransform:'uppercase', fontWeight:700, opacity:0.85, marginBottom:'4px' }}>ADMISSION CHANCE</div>
+                    <div style={{ fontSize:'52px', fontWeight:800, lineHeight:1 }}>~{Math.round(dreamP)}%</div>
+                  </div>
 
-                    {/* Score positioning bar */}
-                    {dreamPos && (
-                      <div style={{ marginBottom:'4px' }}>
-                        <div style={{ ...S.label, color:'rgba(255,255,255,0.4)', fontSize:'8px', marginBottom:'8px' }}>SCORE POSITION vs CUTOFF RANGE</div>
-                        <div style={{ position:'relative', height:'14px', borderRadius:'7px', background:'rgba(255,255,255,0.06)', overflow:'visible' }}>
-                          {/* Cutoff band */}
-                          <div style={{ position:'absolute', top:'2px', bottom:'2px', left:`${dreamPos.pct(dreamPos.low)}%`, width:`${Math.max(2, dreamPos.pct(dreamPos.high) - dreamPos.pct(dreamPos.low))}%`, borderRadius:'5px', background:'linear-gradient(90deg,#f59e0b,#d97706)' }} />
-                          {/* Your score dot */}
-                          <div style={{ position:'absolute', top:'50%', left:`${dreamPos.pct(dreamPos.you)}%`, transform:'translate(-50%,-50%)', width:'16px', height:'16px', borderRadius:'50%', background:'#34d399', border:'3px solid #0f172a', boxShadow:'0 0 8px rgba(52,211,153,0.5)' }} />
-                        </div>
-                        <div style={{ display:'flex', justifyContent:'space-between', marginTop:'4px' }}>
-                          <span style={{ fontSize:'9px', color:'#f59e0b' }}>Cutoff: {Math.round(dreamPos.low)}–{Math.round(dreamPos.high)}</span>
-                          <span style={{ fontSize:'9px', color:'#34d399', fontWeight:700 }}>You: {dreamPos.you.toFixed(1)}</span>
-                        </div>
-                        {/* Margin */}
-                        <div style={{ textAlign:'center', marginTop:'8px' }}>
-                          <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.5)' }}>Your margin: </span>
-                          <span style={{ fontSize:'13px', fontWeight:800, color: dreamPos.margin >= 0 ? '#34d399' : '#f87171' }}>
-                            {dreamPos.margin >= 0 ? '+' : ''}{dreamPos.margin?.toFixed(1)} marks {dreamPos.margin >= 0 ? '✓' : '✗'}
-                          </span>
-                        </div>
+                  {/* 2x2 stats */}
+                  <div style={{ display:'flex', gap:'10px', marginBottom:'10px' }}>
+                    <div style={{ flex:1, border:'1.5px solid #e2e8f0', borderRadius:'12px', padding:'12px 8px', textAlign:'center' }}>
+                      <div style={{ fontSize:'9px', letterSpacing:'0.14em', textTransform:'uppercase', color:'#94a3b8', fontWeight:700, marginBottom:'4px' }}>YOUR COMPOSITE</div>
+                      <div style={{ fontSize:'26px', fontWeight:800, color:'#0f172a', lineHeight:1 }}>{dream.yourComposite?.toFixed(1)}</div>
+                      <div style={{ fontSize:'10px', color:'#94a3b8', marginTop:'2px' }}>out of {dream.outOf}</div>
+                    </div>
+                    <div style={{ flex:1, border:'1.5px solid #e2e8f0', borderRadius:'12px', padding:'12px 8px', textAlign:'center' }}>
+                      <div style={{ fontSize:'9px', letterSpacing:'0.14em', textTransform:'uppercase', color:'#94a3b8', fontWeight:700, marginBottom:'4px' }}>EST. 2026 CUTOFF</div>
+                      <div style={{ fontSize:'26px', fontWeight:800, color:'#0f172a', lineHeight:1 }}>{Math.round(dream.projection.mostLikely)}</div>
+                      <div style={{ fontSize:'10px', color:'#94a3b8', marginTop:'2px' }}>&plusmn;{Math.round(dream.projection.sigma)}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:'10px', marginBottom:'14px' }}>
+                    <div style={{ flex:1, border:'1.5px solid #e2e8f0', borderRadius:'12px', padding:'12px 8px', textAlign:'center' }}>
+                      <div style={{ fontSize:'9px', letterSpacing:'0.14em', textTransform:'uppercase', color:'#94a3b8', fontWeight:700, marginBottom:'4px' }}>2025 CUTOFF</div>
+                      <div style={{ fontSize:'26px', fontWeight:800, color:'#0f172a', lineHeight:1 }}>{dream.cutoff2025 != null ? Math.round(dream.cutoff2025) : '\u2014'}</div>
+                      <div style={{ fontSize:'10px', color:'#94a3b8', marginTop:'2px' }}>Rd 1 &middot; {category}</div>
+                    </div>
+                    <div style={{ flex:1, border:'1.5px solid #e2e8f0', borderRadius:'12px', padding:'12px 8px', textAlign:'center' }}>
+                      <div style={{ fontSize:'9px', letterSpacing:'0.14em', textTransform:'uppercase', color:'#94a3b8', fontWeight:700, marginBottom:'4px' }}>{category} SEATS</div>
+                      <div style={{ fontSize:'26px', fontWeight:800, color:'#0f172a', lineHeight:1 }}>{typeof catSeats === 'number' ? catSeats : '\u2014'}</div>
+                      <div style={{ fontSize:'10px', color:'#94a3b8', marginTop:'2px' }}>this category</div>
+                    </div>
+                  </div>
+
+                  {/* Score positioning bar */}
+                  {dreamPos && (
+                    <div style={{ marginBottom:'14px' }}>
+                      <div style={{ fontSize:'9px', letterSpacing:'0.12em', textTransform:'uppercase', color:'#94a3b8', fontWeight:700, marginBottom:'8px' }}>SCORE POSITION vs CUTOFF RANGE</div>
+                      <div style={{ position:'relative', height:'12px', borderRadius:'6px', background:'#f1f5f9' }}>
+                        <div style={{ position:'absolute', top:'1px', bottom:'1px', left:dreamPos.pct(dreamPos.low)+'%', width:Math.max(3, dreamPos.pct(dreamPos.high) - dreamPos.pct(dreamPos.low))+'%', borderRadius:'5px', background:'linear-gradient(90deg,#fbbf24,#f59e0b)' }} />
+                        <div style={{ position:'absolute', top:'50%', left:dreamPos.pct(dreamPos.you)+'%', transform:'translate(-50%,-50%)', width:'16px', height:'16px', borderRadius:'50%', background:'#10b981', border:'3px solid #fff', boxShadow:'0 0 0 1px #10b981, 0 2px 6px rgba(16,185,129,0.4)' }} />
                       </div>
-                    )}
-                  </div>
-                )}
+                      <div style={{ display:'flex', justifyContent:'space-between', marginTop:'5px' }}>
+                        <span style={{ fontSize:'10px', color:'#f59e0b', fontWeight:600 }}>Cutoff: {Math.round(dreamPos.low)}\u2013{Math.round(dreamPos.high)}</span>
+                        <span style={{ fontSize:'10px', color:'#10b981', fontWeight:700 }}>You: {dreamPos.you.toFixed(1)}</span>
+                      </div>
+                    </div>
+                  )}
 
-                {/* ─── NTA Score vs Subject Max bars ─── */}
-                <div style={S.sectionBg}>
-                  <div style={{ ...S.label, color:'rgba(255,255,255,0.4)', marginBottom:'12px', fontSize:'8px' }}>NTA SCORE vs SUBJECT MAX</div>
+                  {/* Margin */}
+                  <div style={{ textAlign:'center', paddingTop:'6px' }}>
+                    <span style={{ fontSize:'13px', color:'#64748b' }}>Your margin: </span>
+                    <span style={{ fontSize:'15px', fontWeight:800, color: (dreamPos?.margin ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
+                      {(dreamPos?.margin ?? 0) >= 0 ? '+' : ''}{dreamPos?.margin?.toFixed(1)} marks {(dreamPos?.margin ?? 0) >= 0 ? '\u2713' : '\u2717'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── NTA Score vs Subject Max ── */}
+                <div style={{ border:'1.5px solid #e2e8f0', borderRadius:'16px', padding:'18px 20px', marginBottom:'20px', background:'#ffffff' }}>
+                  <div style={{ fontSize:'9px', letterSpacing:'0.12em', textTransform:'uppercase', color:'#94a3b8', fontWeight:700, marginBottom:'12px' }}>NTA SCORE vs SUBJECT MAX</div>
                   {subjectBars.map((sb, i) => {
                     const pct = (sb.score / sb.max) * 100;
                     return (
                       <div key={sb.code} style={{ marginBottom: i < subjectBars.length - 1 ? '10px' : '0' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:'4px' }}>
-                          <span style={{ fontSize:'11px', fontWeight:600, color:'rgba(255,255,255,0.8)' }}>{sb.name}</span>
-                          <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.5)', fontFamily:'monospace' }}>{sb.score.toFixed(1)} <span style={{ color:'rgba(255,255,255,0.25)' }}>/ {sb.max}</span></span>
+                          <span style={{ fontSize:'12px', fontWeight:600, color:'#334155' }}>{sb.name}</span>
+                          <span style={{ fontSize:'11px', color:'#94a3b8', fontFamily:'monospace' }}>{sb.score.toFixed(1)} / {sb.max}</span>
                         </div>
-                        <div style={{ position:'relative', height:'8px', borderRadius:'4px', background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
-                          {/* Max marker */}
-                          <div style={{ position:'absolute', top:0, bottom:0, left:0, width:'100%', borderRadius:'4px', background:'rgba(255,255,255,0.04)' }} />
-                          {/* Score fill */}
-                          <div style={{ position:'absolute', top:0, bottom:0, left:0, width:`${pct}%`, borderRadius:'4px', background: pct >= 90 ? 'linear-gradient(90deg,#34d399,#10b981)' : pct >= 80 ? 'linear-gradient(90deg,#60a5fa,#3b82f6)' : pct >= 70 ? 'linear-gradient(90deg,#fbbf24,#f59e0b)' : 'linear-gradient(90deg,#fb923c,#f97316)' }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div style={{ display:'flex', gap:'12px', marginTop:'10px' }}>
-                    <span style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'9px', color:'rgba(255,255,255,0.4)' }}>
-                      <span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'4px', background:'#34d399' }} /> Your score
-                    </span>
-                    <span style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'9px', color:'rgba(255,255,255,0.4)' }}>
-                      <span style={{ display:'inline-block', width:'8px', height:'8px', borderRadius:'4px', background:'rgba(255,255,255,0.1)' }} /> Subject max
-                    </span>
-                  </div>
-                </div>
-
-                {/* ─── Top 3 programs ─── */}
-                <div style={S.sectionBg}>
-                  <div style={{ ...S.label, color:'rgba(255,255,255,0.4)', marginBottom:'10px', fontSize:'8px' }}>TOP 3 MOST LIKELY PROGRAMS</div>
-                  {top3.map((r, i) => {
-                    const p = r.probability.p ?? 0;
-                    const tone = r.probability.verdict?.tone || 'unknown';
-                    const barW = Math.max(8, p);
-                    return (
-                      <div key={r.id} style={{ display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px', borderRadius:'10px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', marginBottom: i < 2 ? '6px' : '0' }}>
-                        <span style={{ fontSize:'10px', fontWeight:700, color:'rgba(255,255,255,0.25)', width:'18px', flexShrink:0, textAlign:'center' }}>#{i+1}</span>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:'11px', fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.college}</div>
-                          <div style={{ fontSize:'9px', color:'rgba(255,255,255,0.45)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.program}</div>
-                          {/* Mini probability bar */}
-                          <div style={{ marginTop:'4px', height:'4px', borderRadius:'2px', background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
-                            <div style={{ height:'100%', width:`${barW}%`, borderRadius:'2px', background: vc(tone) }} />
-                          </div>
-                        </div>
-                        <div style={{ flexShrink:0, textAlign:'right' }}>
-                          <div style={{ fontSize:'18px', fontWeight:800, color: vc(tone), lineHeight:1 }}>{Math.round(p)}%</div>
+                        <div style={{ position:'relative', height:'8px', borderRadius:'4px', background:'#f1f5f9', overflow:'hidden' }}>
+                          <div style={{ position:'absolute', top:0, bottom:0, left:0, width:pct+'%', borderRadius:'4px', background:barColor(pct) }} />
                         </div>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* ─── Stats summary ─── */}
-                <div style={{ display:'flex', gap:'8px', marginBottom:'20px', position:'relative' }}>
-                  <div style={{ flex:1, background:'rgba(52,211,153,0.08)', border:'1px solid rgba(52,211,153,0.15)', borderRadius:'12px', padding:'12px', textAlign:'center' }}>
-                    <div style={{ fontSize:'26px', fontWeight:800, color:'#34d399' }}>{safeCount}</div>
-                    <div style={{ ...S.label, color:'rgba(255,255,255,0.4)', fontSize:'8px' }}>Safe (75%+)</div>
-                  </div>
-                  <div style={{ flex:1, background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.15)', borderRadius:'12px', padding:'12px', textAlign:'center' }}>
-                    <div style={{ fontSize:'26px', fontWeight:800, color:'#818cf8' }}>{results.length}</div>
-                    <div style={{ ...S.label, color:'rgba(255,255,255,0.4)', fontSize:'8px' }}>Total Eligible</div>
-                  </div>
-                </div>
-
-                {/* ─── Footer CTA ─── */}
-                <div style={{ position:'relative', borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:'16px', textAlign:'center' }}>
-                  <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.45)', lineHeight:1.5 }}>
-                    Check your real admission probability at your dream college free →
-                  </div>
-                  <div style={{ fontSize:'14px', fontWeight:800, color:'#a78bfa', marginTop:'4px', letterSpacing:'-0.01em' }}>
-                    dreamseat.vercel.app
-                  </div>
+                {/* Footer CTA */}
+                <div style={{ borderTop:'1.5px solid #e2e8f0', paddingTop:'16px', textAlign:'center' }}>
+                  <div style={{ fontSize:'12px', color:'#94a3b8', lineHeight:1.5 }}>Check your real admission probability at your dream college free &rarr;</div>
+                  <div style={{ fontSize:'15px', fontWeight:800, color:'#4f46e5', marginTop:'4px' }}>dreamseat.vercel.app</div>
                 </div>
               </div>
             </div>
 
-            {/* ─── Share action buttons ─── */}
-            <div className="px-5 py-3.5 border-t border-slate-100 bg-white shrink-0">
+            {/* Share buttons */}
+            <div className="px-5 py-3.5 border-t border-slate-100 bg-white">
               {generating ? (
                 <div className="text-center text-sm text-slate-500 py-2">Generating your card...</div>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    {/* ── WhatsApp: share image+text on mobile, text-only link on desktop ── */}
-                    <button disabled={!imageUrl} onClick={async () => {
-                      if (!imageUrl) return;
-                      const shared = await shareWithImage(whatsappText);
-                      if (!shared) {
-                        // Desktop fallback: open WhatsApp Web with text link
-                        window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, '_blank');
-                      }
-                    }}
+                    <button disabled={!imageUrl} onClick={async () => { if (!imageUrl) return; const ok = await shareWithImage(shareText); if (!ok) window.open('https://wa.me/?text='+encodeURIComponent(shareText),'_blank'); }}
                       className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl bg-[#25D366] text-white text-sm font-bold hover:bg-[#1ebe57] disabled:opacity-40 transition-colors">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 0 0 .611.611l4.458-1.495A11.933 11.933 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.396 0-4.612-.77-6.42-2.076l-.253-.183-3.237 1.085 1.085-3.237-.183-.253A9.955 9.955 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
                       WhatsApp
                     </button>
-
-                    {/* ── Instagram / Share: always shares image via native share sheet ── */}
-                    <button disabled={!imageUrl} onClick={async () => {
-                      if (!imageUrl) return;
-                      const shared = await shareWithImage(whatsappText);
-                      if (!shared) {
-                        // Desktop: just download — user can manually upload to IG
-                        downloadImage();
-                      }
-                    }}
-                      className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 text-white text-sm font-bold hover:from-purple-700 hover:via-pink-600 hover:to-orange-600 disabled:opacity-40 transition-colors">
+                    <button disabled={!imageUrl} onClick={async () => { if (!imageUrl) return; const ok = await shareWithImage(shareText); if (!ok) downloadImage(); }}
+                      className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 text-white text-sm font-bold disabled:opacity-40 transition-colors">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
                       Instagram
                     </button>
-
-                    {/* ── Twitter/X: share image+text on mobile, text-only link on desktop ── */}
-                    <button disabled={!imageUrl} onClick={async () => {
-                      if (!imageUrl) return;
-                      const shared = await shareWithImage(twitterText);
-                      if (!shared) {
-                        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterText)}`, '_blank');
-                      }
-                    }}
+                    <button disabled={!imageUrl} onClick={async () => { if (!imageUrl) return; const ok = await shareWithImage(tweetText); if (!ok) window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(tweetText),'_blank'); }}
                       className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl bg-black text-white text-sm font-bold hover:bg-gray-800 disabled:opacity-40 transition-colors">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                       Twitter / X
                     </button>
-
-                    {/* ── Download: always available ── */}
                     <button onClick={downloadImage} disabled={!imageUrl}
                       className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl bg-slate-800 text-white text-sm font-bold hover:bg-slate-700 disabled:opacity-40 transition-colors">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       Save Image
                     </button>
                   </div>
-                  <p className="text-center text-[10px] text-slate-400 mt-2.5">
-                    On mobile: image is attached automatically · On desktop: save the image first, then share
-                  </p>
+                  <p className="text-center text-[10px] text-slate-400 mt-2.5">On mobile: image is attached automatically &middot; On desktop: save first, then share</p>
                 </>
               )}
             </div>
