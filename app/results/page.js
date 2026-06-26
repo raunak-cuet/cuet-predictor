@@ -1493,7 +1493,7 @@ function ShareResults({ payload, results, dream }) {
                         <div style={{ position: 'absolute', top: '50%', left: dreamPos.pct(dreamPos.you) + '%', transform: 'translate(-50%,-50%)', width: '16px', height: '16px', borderRadius: '50%', background: '#10b981', border: '3px solid #fff', boxShadow: '0 0 0 1px #10b981' }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                        <span style={{ fontSize: '10px', color: '#d97706', fontWeight: 700 }}>Cutoff: {Math.round(dreamPos.low)}\u2013{Math.round(dreamPos.high)}</span>
+                        <span style={{ fontSize: '10px', color: '#d97706', fontWeight: 700 }}>Cutoff: {Math.round(dreamPos.low)}{'\u2013'}{Math.round(dreamPos.high)}</span>
                         <span style={{ fontSize: '10px', color: '#059669', fontWeight: 700 }}>You: {dreamPos.you.toFixed(1)}</span>
                       </div>
                     </div>
@@ -1568,13 +1568,10 @@ function ShareResults({ payload, results, dream }) {
                       icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>}
                       onClick={copyLink} />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
                     <ShareBtn label="Save Image" iconColor="#0f172a" filled
                       icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}
                       onClick={downloadImage} />
-                    <ShareBtn label="Screenshot" iconColor="#6366f1"
-                      icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>}
-                      onClick={() => setShareMsg('Scroll the card to capture everything you want to share')} />
                   </div>
                   <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '12px', lineHeight: 1.5 }}>
                     {isMobile
