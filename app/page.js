@@ -22,7 +22,8 @@ export default function Home() {
   const [subjectsTaken, setSubjectsTaken] = useState([]);
   const [scores, setScores] = useState({});
   const [category, setCategory] = useState('UR');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [dreamId, setDreamId] = useState('');
   const [dreamLabel, setDreamLabel] = useState('');
   const [searchDream, setSearchDream] = useState('');
@@ -55,7 +56,8 @@ export default function Home() {
           setSubjectsTaken(devSubjects);
           setScores(devScores);
           setCategory('UR');
-          setName('Raunak Pandey');
+          setFirstName('Raunak');
+          setLastName('Pandey');
           // Dream: SSCBS BBA(FIA) — we set it after eligible programs recompute
           setTimeout(() => {
             const opts = eligibleProgramsForSubjects(devSubjects);
@@ -205,12 +207,31 @@ export default function Home() {
   const clearDream = () => { setDreamId(''); setDreamLabel(''); setSearchDream(''); };
 
   const allScoresValid = subjectsTaken.every(c => typeof scores[c] === 'number');
-  const nameCheck = useMemo(() => validateName(name), [name]);
+  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+  const firstNameCheck = useMemo(() => {
+    const v = firstName.trim();
+    if (!v) return { ok: false, reason: 'First name is required' };
+    if (v.length < 2) return { ok: false, reason: 'First name must be at least 2 letters' };
+    if (!/^[\p{L}\s'\-\.]+$/u.test(v)) return { ok: false, reason: 'Only letters, hyphens & apostrophes' };
+    return { ok: true };
+  }, [firstName]);
+  const lastNameCheck = useMemo(() => {
+    const v = lastName.trim();
+    if (!v) return { ok: false, reason: 'Last name is required' };
+    if (v.length < 2) return { ok: false, reason: 'Last name must be at least 2 letters' };
+    if (!/^[\p{L}\s'\-\.]+$/u.test(v)) return { ok: false, reason: 'Only letters, hyphens & apostrophes' };
+    return { ok: true };
+  }, [lastName]);
+  const nameCheck = useMemo(() => {
+    if (!firstNameCheck.ok) return firstNameCheck;
+    if (!lastNameCheck.ok) return lastNameCheck;
+    return validateName(fullName);
+  }, [firstNameCheck, lastNameCheck, fullName]);
   const canSubmit = nameCheck.ok && subjectsTaken.length >= 1 && allScoresValid;
 
   async function submit() {
     setErr('');
-    if (!nameCheck.ok)             { setErr(nameCheck.reason || 'Please enter your real name'); return; }
+    if (!nameCheck.ok)             { setErr(nameCheck.reason || 'Please enter your first and last name'); return; }
     if (subjectsTaken.length < 1)  { setErr('Please select at least one subject you appeared for.'); return; }
     if (!allScoresValid)           { setErr('Please enter a valid score (0–250) for every selected subject.'); return; }
     setBusy(true);
@@ -218,7 +239,7 @@ export default function Home() {
       const res = await fetch('/api/submit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(), category, scores, subjectsTaken,
+          name: fullName, category, scores, subjectsTaken,
           dreamProgramId: dreamId ? Number(dreamId) : null,
           dreamLabel: dreamLabel || null
         })
@@ -226,7 +247,7 @@ export default function Home() {
       const json = await res.json();
       if (!res.ok) { setErr(json.error || 'Server error'); setBusy(false); return; }
       sessionStorage.setItem('cuet:results', JSON.stringify({
-        payload: { name: name.trim(), category, scores, subjectsTaken,
+        payload: { name: fullName, category, scores, subjectsTaken,
                    dreamProgramId: dreamId ? Number(dreamId) : null, dreamLabel: dreamLabel || null },
         response: json
       }));
@@ -363,16 +384,34 @@ export default function Home() {
 
           {/* STEP 4 */}
           <Step n={4} title={<>Your name <span className="text-rose-500">*</span></>} subtitle="Used only to personalise your results — please use your real name 🙂">
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Aarav Sharma"
-              autoComplete="name"
-              className={`field ${nameCheck.ok ? 'field-ok' : (name.trim().length > 0 ? 'field-err' : '')}`} />
-            <div className="mt-1.5 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">First name</label>
+                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="e.g. Aarav"
+                  autoComplete="given-name"
+                  className={`field ${firstNameCheck.ok ? 'field-ok' : (firstName.trim().length > 0 ? 'field-err' : '')}`} />
+                {firstName.trim().length > 0 && !firstNameCheck.ok && (
+                  <div className="mt-1 text-[11px] text-rose-600">{firstNameCheck.reason}</div>
+                )}
+              </div>
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">Last name / Surname</label>
+                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                  placeholder="e.g. Sharma"
+                  autoComplete="family-name"
+                  className={`field ${lastNameCheck.ok ? 'field-ok' : (lastName.trim().length > 0 ? 'field-err' : '')}`} />
+                {lastName.trim().length > 0 && !lastNameCheck.ok && (
+                  <div className="mt-1 text-[11px] text-rose-600">{lastNameCheck.reason}</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-2 text-xs">
               {nameCheck.ok
-                ? <span className="text-emerald-700">✓ Looks good, {name.trim().split(' ')[0]}.</span>
-                : (name.trim().length > 0
-                    ? <span className="text-rose-600">{nameCheck.reason}</span>
-                    : <span className="text-slate-400">Enter your full first &amp; last name.</span>)}
+                ? <span className="text-emerald-700">✓ Looks good, {firstName.trim()}!</span>
+                : (firstName.trim().length > 0 || lastName.trim().length > 0
+                    ? <span className="text-rose-600">{!firstNameCheck.ok ? firstNameCheck.reason : !lastNameCheck.ok ? lastNameCheck.reason : nameCheck.reason}</span>
+                    : <span className="text-slate-400">Both first name and last name are required.</span>)}
             </div>
           </Step>
 
@@ -420,7 +459,7 @@ export default function Home() {
 
           {!canSubmit && (
             <div className="text-center text-xs text-slate-500 -mt-2 space-x-2">
-              {!nameCheck.ok && <span>· Enter your real name</span>}
+              {!nameCheck.ok && <span>· Enter your first &amp; last name</span>}
               {subjectsTaken.length === 0 && <span>· Pick subjects</span>}
               {subjectsTaken.length > 0 && !allScoresValid && <span>· Fill all scores</span>}
             </div>

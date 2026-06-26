@@ -393,7 +393,7 @@ P = 1 / (1 + exp(-k × margin))
 
 3. **Step 3 — Category**: Radio buttons for UR, OBC-NCL, SC, ST, EWS, PwBD.
 
-4. **Step 4 — Name**: Text input with live validation (see §17).
+4. **Step 4 — Name**: Two separate inputs — **First Name** and **Last Name / Surname** — both required (min 2 letters each). Each field validates independently, then the combined full name runs through the main validator (see §17). This split reduces fake/lazy entries significantly vs a single name field.
 
 5. **Step 5 — Dream College** (optional): Searchable dropdown. Only shows programs the student is eligible for based on their subjects. Uses relevance-scored search (see §13). Renders as a portal-based dropdown that escapes all stacking contexts.
 
@@ -615,7 +615,7 @@ General Aptitude Test
 In `app/page.js` — triggered by pressing **Ctrl+Shift+K three times** within 1.2 seconds on the home page.
 
 ### What it fills:
-- Name: "Raunak Pandey"
+- First Name: "Raunak", Last Name: "Pandey"
 - Category: UR
 - Subjects: English (101), Business Studies (305), Economics (309), Mathematics (319), GAT (501)
 - Scores: 216.07, 228.02, 234.96, 219.43, 194.41
