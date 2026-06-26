@@ -1373,25 +1373,32 @@ function ShareResults({ payload, results, dream }) {
   }, [imageUrl, imageUrlToBlob]);
 
   const generateImage = useCallback(async () => {
-    if (!cardRef.current) return;
+    if (!dream) return;
     setGenerating(true);
     setGenError(null);
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false,
+      // html2canvas is fragile with flex/absolute positioning, web-font metrics,
+      // and transforms. The downloaded card is generated directly on <canvas>
+      // so the saved PNG is deterministic and cannot drift from browser layout.
+      if (typeof document !== 'undefined' && document.fonts?.ready) {
+        try { await document.fonts.ready; } catch {}
+      }
+      const dataUrl = renderShareCardPng({
+        name,
+        category,
+        eligibleCount: results.length,
+        dream,
+        subjectBars,
+        dreamPos,
       });
-      setImageUrl(canvas.toDataURL('image/png'));
+      setImageUrl(dataUrl);
     } catch (e) {
       console.error('Share card generation failed:', e);
       setGenError('Failed to generate image. Please try again.');
     } finally {
       setGenerating(false);
     }
-  }, []);
+  }, [dream, name, category, results.length, subjectBars, dreamPos]);
 
   const downloadImage = useCallback(() => {
     if (!imageUrl) return;
@@ -1505,7 +1512,10 @@ function ShareResults({ payload, results, dream }) {
             )}
 
             <div style={{ padding: '16px', background: '#f8fafc', overflowX: 'auto' }}>
-              <div ref={cardRef} style={{ width: '460px', margin: '0 auto', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '28px 26px', fontFamily: "'Inter', system-ui, sans-serif", color: '#0f172a', boxSizing: 'border-box' }}>
+              {imageUrl && (
+                <img src={imageUrl} alt="DreamSeat Results Preview" style={{ display: 'block', width: '460px', maxWidth: '100%', margin: '0 auto', borderRadius: '20px', border: '1px solid #e2e8f0', background: '#ffffff' }} />
+              )}
+              <div ref={cardRef} style={{ display: imageUrl ? 'none' : 'block', width: '460px', margin: '0 auto', background: '#ffffff', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '28px 26px', fontFamily: "'Inter', system-ui, sans-serif", color: '#0f172a', boxSizing: 'border-box' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                   <div style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif", fontStyle: 'italic', fontSize: '26px', letterSpacing: '-0.01em', lineHeight: 1 }}>
                     <span style={{ color: '#312e81' }}>Dream</span><span style={{ color: '#4f46e5' }}>Seat</span>
@@ -1725,6 +1735,225 @@ function ShareBtn({ label, iconColor, icon, onClick, filled }) {
       <span>{label}</span>
     </button>
   );
+}
+
+
+function renderShareCardPng({ name, category, eligibleCount, dream, subjectBars, dreamPos }) {
+  const S = 2;
+  const W = 460;
+  const pad = 26;
+  const innerW = W - pad * 2;
+  const subjectH = 37;
+  const panelH = 92 + 190 + 14 + 128 + 14 + 72 + 48 + 42 + (subjectBars.length * subjectH) + 28;
+  const H = 178 + panelH + 92;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * S;
+  canvas.height = H * S;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(S, S);
+
+  const colors = {
+    ink: '#0f172a',
+    slate: '#64748b',
+    muted: '#94a3b8',
+    border: '#e2e8f0',
+    indigo: '#4f46e5',
+    indigoDark: '#312e81',
+    emerald: '#059669',
+    amber: '#d97706',
+  };
+
+  const dreamP = Math.round(dream.probability?.p ?? 0);
+  const verdict = dream.probability?.verdict || {};
+  const low = Math.round(dream.projection.conservative);
+  const mid = Math.round(dream.projection.mostLikely);
+  const high = Math.round(dream.projection.aggressive);
+  const you = dream.yourComposite ?? 0;
+  const outOf = dream.outOf ?? 1000;
+  const margin = dream.probability?.margin ?? (you - dream.projection.mostLikely);
+  const catSeats = dream.seats?.[category];
+
+  const fontSans = 'Inter, Arial, Helvetica, sans-serif';
+  const fontSerif = 'Georgia, Times New Roman, serif';
+
+  function rr(x, y, w, h, r, fill, stroke, line = 1) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = line; ctx.stroke(); }
+  }
+
+  function text(t, x, y, size, weight = 400, color = colors.ink, align = 'left', family = fontSans, style = '') {
+    ctx.font = `${style ? style + ' ' : ''}${weight} ${size}px ${family}`;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(String(t ?? ''), x, y);
+  }
+
+  function measure(t, size, weight = 400, family = fontSans, style = '') {
+    ctx.font = `${style ? style + ' ' : ''}${weight} ${size}px ${family}`;
+    return ctx.measureText(String(t ?? '')).width;
+  }
+
+  function ellipsize(t, maxW, size, weight = 400, family = fontSans) {
+    t = String(t ?? '');
+    if (measure(t, size, weight, family) <= maxW) return t;
+    while (t.length > 1 && measure(t + '…', size, weight, family) > maxW) t = t.slice(0, -1);
+    return t + '…';
+  }
+
+  function line(x1, y1, x2, y2, color = colors.border, width = 1) {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+  }
+
+  function circle(x, y, r, fill, stroke, sw = 1) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = fill; ctx.fill();
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke(); }
+  }
+
+  function pill(x, y, w, h, fill, stroke) { rr(x, y, w, h, h / 2, fill, stroke); }
+
+  function badge(x, y, label, tone = 'safe') {
+    const map = {
+      safe:  ['#dcfce7', '#16a34a', '#166534'],
+      good:  ['#dbeafe', '#60a5fa', '#1e40af'],
+      mid:   ['#fef3c7', '#f59e0b', '#92400e'],
+      risk:  ['#ffedd5', '#fb923c', '#9a3412'],
+      reach: ['#fee2e2', '#ef4444', '#991b1b'],
+    }[tone] || ['#e2e8f0', '#94a3b8', '#475569'];
+    const w = Math.max(88, measure(label, 11, 800) + 32);
+    pill(x, y, w, 26, map[0], map[1]);
+    circle(x + 15, y + 13, 6, '#00d113', '#0f172a', 1);
+    text(label, x + 29, y + 17, 11, 800, map[2]);
+    return w;
+  }
+
+  function statBox(x, y, w, label, value, sub) {
+    rr(x, y, w, 76, 10, '#ffffff', colors.border, 1);
+    text(label, x + w / 2, y + 24, 8.5, 800, colors.muted, 'center');
+    text(value, x + w / 2, y + 52, 24, 900, colors.ink, 'center');
+    if (sub) text(sub, x + w / 2, y + 66, 9.5, 500, colors.muted, 'center');
+  }
+
+  // Background / outer shell
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  rr(0.5, 0.5, W - 1, H - 1, 20, '#ffffff', '#dbe3ee', 1);
+
+  // Header
+  text('Dream', pad, 64, 28, 400, colors.indigoDark, 'left', fontSerif, 'italic');
+  text('Seat', pad + measure('Dream', 28, 400, fontSerif, 'italic') - 2, 64, 28, 400, colors.indigo, 'left', fontSerif, 'italic');
+  text('CUET 2026', W - pad, 52, 12, 800, colors.muted, 'right');
+  text('PREDICTIONS FOR', pad, 92, 12, 800, colors.muted);
+  text(ellipsize(name || 'Student', innerW, 34, 400, fontSerif), pad, 150, 34, 400, colors.ink, 'left', fontSerif);
+  pill(pad, 162, 44, 24, '#e0e7ff', '#c7d2fe');
+  text(category, pad + 22, 178, 10.5, 900, '#3730a3', 'center');
+  text(`${eligibleCount.toLocaleString()} eligible programs`, pad + 54, 178, 13, 500, colors.slate);
+
+  // Dream panel
+  let y = 205;
+  rr(pad, y, innerW, panelH, 16, '#f8fafc', colors.border, 1);
+  const px = pad + 18;
+  let py = y + 36;
+  text('★ DREAM COLLEGE', px, py, 10, 900, colors.amber);
+  badge(W - pad - 18 - 102, y + 20, verdict.label || 'Verdict', verdict.tone || 'safe');
+  py += 28;
+  text(ellipsize(dream.college, innerW - 36, 17, 900), px, py, 17, 900, colors.ink);
+  py += 20;
+  text(ellipsize(dream.program, innerW - 36, 12.5, 500), px, py, 12.5, 500, colors.slate);
+
+  // Admission card
+  py = y + 128;
+  const grad = ctx.createLinearGradient(px, py, px + innerW - 36, py + 190);
+  grad.addColorStop(0, '#6366f1'); grad.addColorStop(0.5, '#7c3aed'); grad.addColorStop(1, '#8b5cf6');
+  rr(px, py, innerW - 36, 190, 14, grad, null);
+  circle(px + innerW - 80, py + 28, 62, 'rgba(255,255,255,0.09)');
+  text('ADMISSION CHANCE', W / 2, py + 44, 11, 900, 'rgba(255,255,255,0.84)', 'center');
+  text(dreamP, W / 2 - 6, py + 130, 66, 900, '#ffffff', 'center');
+  text('%', W / 2 + 56, py + 102, 32, 900, '#ffffff', 'left');
+  const bw = Math.max(110, measure(verdict.label || '', 12, 800) + 38);
+  pill(W / 2 - bw / 2, py + 140, bw, 26, 'rgba(255,255,255,0.16)', 'rgba(255,255,255,0.28)');
+  circle(W / 2 - bw / 2 + 23, py + 153, 6.5, '#00d113', '#0f172a', 1);
+  text(verdict.label || '', W / 2 - bw / 2 + 39, py + 158, 12, 800, '#ffffff');
+
+  // Expected cutoff card
+  py += 204;
+  rr(px, py, innerW - 36, 126, 14, '#f8faff', '#c7d2fe', 1);
+  circle(px + 18, py + 23, 3, colors.indigo);
+  text('EXPECTED 2026 CUTOFF', px + 28, py + 28, 9.5, 900, colors.indigo);
+  pill(px + innerW - 170, py + 17, 31, 20, '#fffbeb', '#fcd34d');
+  text(low, px + innerW - 154, py + 31, 9.5, 700, '#b45309', 'center');
+  pill(px + innerW - 129, py + 17, 36, 20, '#ffffff', '#a5b4fc');
+  text(mid, px + innerW - 111, py + 31, 10, 900, '#4338ca', 'center');
+  pill(px + innerW - 83, py + 17, 33, 20, '#faf5ff', '#ddd6fe');
+  text(high, px + innerW - 66.5, py + 31, 9.5, 700, '#7c3aed', 'center');
+  text('range · likely · high', px + innerW - 50, py + 54, 9.5, 500, colors.muted, 'right');
+  text(mid, px + 16, py + 75, 42, 900, colors.indigoDark);
+  text(`/ ${outOf}`, px + 94, py + 75, 12, 800, '#818cf8');
+
+  const barX = px + 16, barY = py + 84, barW = innerW - 68;
+  pill(barX, barY, barW, 12, '#dbe4ff', null);
+  const min = Math.min(low - 30, you - 40);
+  const max = Math.max(high + 30, you + 40);
+  const pct = v => Math.max(0.02, Math.min(0.98, (v - min) / (max - min)));
+  const bx1 = barX + pct(low) * barW;
+  const bx2 = barX + pct(high) * barW;
+  const bg = ctx.createLinearGradient(bx1, 0, bx2, 0);
+  bg.addColorStop(0, '#fbbf24'); bg.addColorStop(0.5, '#818cf8'); bg.addColorStop(1, '#a78bfa');
+  pill(bx1, barY + 2, Math.max(8, bx2 - bx1), 8, bg, null);
+  line(barX + pct(mid) * barW, barY - 4, barX + pct(mid) * barW, barY + 16, '#4338ca', 1.4);
+  circle(barX + pct(you) * barW, barY + 6, 7, '#10b981', '#ffffff', 2.5);
+  text(`Cutoff: ${low}–${high}`, barX, py + 117, 10.5, 900, colors.amber);
+  text(`You: ${you.toFixed(1)}`, barX + barW, py + 117, 10.5, 900, colors.emerald, 'right');
+
+  // Stats
+  py += 140;
+  const gap = 8;
+  const sw = (innerW - 36 - gap * 2) / 3;
+  statBox(px, py, sw, 'YOUR COMPOSITE', you.toFixed(1), `out of ${outOf}`);
+  statBox(px + sw + gap, py, sw, '2025 CUTOFF', dream.cutoff2025 != null ? Math.round(dream.cutoff2025) : '—');
+  statBox(px + (sw + gap) * 2, py, sw, `${category} SEATS`, typeof catSeats === 'number' ? catSeats : '—', typeof catSeats === 'number' ? (catSeats === 0 ? 'no reserved' : 'this category') : '');
+
+  py += 104;
+  text('Your margin:', W / 2 - 8, py, 13, 500, colors.slate, 'right');
+  text(`${margin >= 0 ? '+' : ''}${margin.toFixed(1)} marks ✓`, W / 2 - 4, py, 13, 900, colors.emerald);
+  py += 28;
+  line(px, py, px + innerW - 36, py, colors.border);
+
+  // Subjects
+  py += 33;
+  text('NTA SCORE VS SUBJECT MAX', px, py, 10, 900, colors.slate);
+  py += 26;
+  subjectBars.forEach((sb) => {
+    const max = sb.max || 250;
+    const pctScore = Math.max(0, Math.min(1, sb.score / max));
+    text(ellipsize(sb.name, 230, 12, 700), px, py, 12, 700, '#334155');
+    text(`${sb.score.toFixed(1)} / ${max}`, px + innerW - 36, py, 10, 700, colors.muted, 'right', 'monospace');
+    pill(px, py + 6, innerW - 36, 7, '#e2e8f0', null);
+    pill(px, py + 6, (innerW - 36) * pctScore, 7, pctScore > 0.9 ? '#10b981' : pctScore > 0.82 ? '#3b82f6' : '#f59e0b', null);
+    py += subjectH;
+  });
+
+  // Footer
+  y = 178 + panelH + 26;
+  line(pad, y, W - pad, y, colors.border);
+  text('Check your real admission probability at your dream college free →', W / 2, y + 38, 12.5, 500, colors.slate, 'center');
+  text('dreamseat.vercel.app', W / 2, y + 64, 15, 900, colors.indigo, 'center');
+
+  return canvas.toDataURL('image/png');
 }
 
 function DisclaimerCard() {
