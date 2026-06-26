@@ -1335,7 +1335,7 @@ function ShareResults({ payload, results, dream }) {
 
   const name = payload.name || 'Student';
   const category = payload.category || 'UR';
-  const firstName = name.split(' ')[0];
+  const firstName = name;
 
   // Subject bars data
   const subjectBars = useMemo(() => {
@@ -1510,15 +1510,15 @@ function ShareResults({ payload, results, dream }) {
                   <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8' }}>CUET 2026</span>
                 </div>
 
-                {/* ── Student info ── */}
-                <div style={{ marginBottom: '22px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
-                  <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.05 }}>{firstName}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 11px', borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>{category}</span>
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>{results.length.toLocaleString()} eligible programs</span>
-                  </div>
-                </div>
+{/* ── Student info ── */}
+<div style={{ marginBottom: '22px' }}>
+  <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
+  <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{firstName}</div>
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+    <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 12px', borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', lineHeight: 1.4 }}>{category}</span>
+    <span style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>{results.length.toLocaleString()} eligible programs</span>
+  </div>
+</div>
 
                 {/* ═══════════ UNIFIED DREAM COLLEGE CARD ═══════════ */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginBottom: '18px' }}>
@@ -1537,7 +1537,7 @@ function ShareResults({ payload, results, dream }) {
                   {/* Big probability banner */}
                   <div style={{ textAlign: 'center', padding: '18px 0', background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%)', borderRadius: '14px', marginBottom: '14px' }}>
                     <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', marginBottom: '4px' }}>ADMISSION CHANCE</div>
-                    <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '56px', color: '#ffffff', lineHeight: 1 }}>~{dreamP}%</div>
+                    <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '56px', color: '#ffffff', lineHeight: 1.2, paddingTop: '4px', paddingBottom: '4px' }}>~{dreamP}%</div>
                   </div>
 
                   {/* Stats 2×2 grid using flex (html2canvas-safe) */}
