@@ -5,9 +5,18 @@ export default function robots() {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin/', '/api/', '/maintenance'],
+        disallow: [
+          '/admin',
+          '/admin/',
+          '/admin/*',
+          '/api/',
+          '/api/*',
+          '/maintenance',
+          '/maintenance/*'
+        ],
       },
     ],
     sitemap: 'https://dreamseat.vercel.app/sitemap.xml',
+    host: 'https://dreamseat.vercel.app',
   };
 }
