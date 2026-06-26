@@ -1499,7 +1499,7 @@ function ShareResults({ payload, results, dream }) {
                           fontSize: '68px',
                           fontWeight: 800,
                           lineHeight: 1,
-                          transform: 'translateY(2px)',
+                          transform: 'translateY(7px)',
                           display: 'inline-block',
                         }}>{dreamP}</span>
                         <span style={{
@@ -1507,7 +1507,7 @@ function ShareResults({ payload, results, dream }) {
                           fontWeight: 700,
                           lineHeight: 1,
                           marginLeft: '4px',
-                          transform: 'translateY(-2px)',
+                          transform: 'translateY(-7px)',
                           display: 'inline-block',
                         }}>%</span>
                       </div>
