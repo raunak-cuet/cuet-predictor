@@ -1515,29 +1515,27 @@ function ShareResults({ payload, results, dream }) {
   <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
   <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{firstName}</div>
   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-    <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 12px', borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', lineHeight: 1.4 }}>{category}</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, padding: '5px 14px', borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', lineHeight: 1, letterSpacing: '0.04em' }}>{category}</span>
     <span style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>{results.length.toLocaleString()} eligible programs</span>
   </div>
 </div>
-
-                {/* ═══════════ UNIFIED DREAM COLLEGE CARD ═══════════ */}
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginBottom: '18px' }}>
-                  {/* Header */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '12px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '5px' }}>&#x2605; DREAM COLLEGE</div>
-                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', lineHeight: 1.3 }}>{dreamProgram}</div>
-                    </div>
-                    <div style={{ flexShrink: 0, fontSize: '10px', fontWeight: 700, padding: '4px 11px', borderRadius: '20px', background: vBadge(dreamVerdict?.tone).bg, color: vBadge(dreamVerdict?.tone).color, border: `1px solid ${vBadge(dreamVerdict?.tone).border}`, whiteSpace: 'nowrap' }}>
-                      {dreamVerdict?.emoji} {dreamVerdict?.label}
-                    </div>
-                  </div>
-
+{/* ═══════════ UNIFIED DREAM COLLEGE CARD ═══════════ */}
+<div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginBottom: '18px' }}>
+  {/* Header */}
+  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '12px' }}>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '5px' }}>&#x2605; DREAM COLLEGE</div>
+      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
+      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', lineHeight: 1.3 }}>{dreamProgram}</div>
+    </div>
+    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', flexShrink: 0, fontSize: '10px', fontWeight: 700, padding: '5px 12px', borderRadius: '20px', background: vBadge(dreamVerdict?.tone).bg, color: vBadge(dreamVerdict?.tone).color, border: `1px solid ${vBadge(dreamVerdict?.tone).border}`, whiteSpace: 'nowrap', lineHeight: 1 }}>
+      <span>{dreamVerdict?.emoji}</span><span>{dreamVerdict?.label}</span>
+    </div>
+  </div>
                   {/* Big probability banner */}
-                  <div style={{ textAlign: 'center', padding: '18px 0', background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%)', borderRadius: '14px', marginBottom: '14px' }}>
+                  <div style={{ textAlign: 'center', padding: '20px 16px 22px', background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%)', borderRadius: '14px', marginBottom: '14px' }}>
                     <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', marginBottom: '4px' }}>ADMISSION CHANCE</div>
-                    <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '56px', color: '#ffffff', lineHeight: 1.2, paddingTop: '4px', paddingBottom: '4px' }}>~{dreamP}%</div>
+                    <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400, fontSize: '52px', color: '#ffffff', lineHeight: 1.15, paddingTop: '6px', paddingBottom: '6px', letterSpacing: '-0.01em' }}>~{dreamP}%</div>
                   </div>
 
                   {/* Stats 2×2 grid using flex (html2canvas-safe) */}
