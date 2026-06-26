@@ -5,8 +5,46 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata = {
-  title: 'DreamSeat | CUET 2026 College & Cutoff Predictor',
-  description: 'A statistical engine projecting expected 2026 cutoffs and your real admission chances across every Delhi University college and program.',
+  metadataBase: new URL('https://dreamseat.vercel.app'),
+  title: 'DreamSeat | Free CUET 2026 DU Cutoff Predictor & College Calculator',
+  description: 'Free Delhi University admission predictor for CUET 2026. Calculate your composite score, projected 2026 cutoffs, and admission probability for all 1,526 DU programs across 67 colleges. No signup, no ads.',
+  keywords: [
+    // Primary intent
+    'DU cutoff 2026',
+    'CUET 2026 cutoff',
+    'Delhi University cutoff 2026',
+    'DU admission 2026',
+    'CUET cutoff predictor',
+    // CSAS / preference list
+    'CSAS 2026',
+    'CSAS preference list',
+    'DU preference list 2026',
+    'CUET preference order',
+    // Composite & calculation
+    'CUET composite score calculator',
+    'DU composite score',
+    'CUET marks to DU college',
+    'DU merit calculator',
+    // College / program
+    'DU college predictor',
+    'best DU college for my CUET score',
+    'SRCC cutoff 2026',
+    'Hindu College cutoff 2026',
+    'LSR cutoff 2026',
+    'B.Com Hons DU cutoff',
+    'B.A. Economics DU cutoff',
+    'B.Sc Physics DU cutoff',
+    'BMS DU cutoff',
+    // Probability / outcomes
+    'CUET admission probability',
+    'DU admission chances',
+    'will I get DU',
+    // Brand
+    'DreamSeat'
+  ],
+  authors: [{ name: 'Raunak Pandey' }],
+  creator: 'Raunak Pandey',
+  publisher: 'DreamSeat',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
@@ -16,17 +54,79 @@ export const metadata = {
     apple: '/apple-touch-icon.png'
   },
   openGraph: {
-    title: 'DreamSeat | CUET 2026 College & Cutoff Predictor',
-    description: 'Project expected 2026 cutoffs and your real DU admission chances. 1,526 college-program combinations.',
+    title: 'DreamSeat | Free CUET 2026 DU Cutoff Predictor',
+    description: 'Calculate your DU admission probability for all 1,526 programs based on your CUET 2026 scores. Free, no signup, no ads.',
+    url: 'https://dreamseat.vercel.app',
+    siteName: 'DreamSeat',
+    type: 'website',
+    locale: 'en_IN',
+    images: [
+      {
+        url: '/stars-icon-rounded.png',
+        width: 1200,
+        height: 630,
+        alt: 'DreamSeat — CUET 2026 DU Cutoff Predictor'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'DreamSeat | Free CUET 2026 DU Cutoff Predictor',
+    description: 'Calculate your DU admission probability for all 1,526 programs. Free, no signup.',
     images: ['/stars-icon-rounded.png']
-  }
+  },
+  verification: {
+    google: 'qc-IwvbEhiifZ98-9-cx92JESwMOe_Pq0BlVaYFVi28'
+  },
+  alternates: {
+    canonical: 'https://dreamseat.vercel.app'
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1
+    }
+  },
+  category: 'education'
 };
+
 export const viewport = { width: 'device-width', initialScale: 1 };
 
 // Force every page render to be dynamic — bypasses Vercel's edge cache so
 // middleware-driven maintenance routing always works.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// Schema.org structured data — helps Google understand what your site is
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'DreamSeat',
+  alternateName: 'DreamSeat CUET Predictor',
+  description: 'Free Delhi University admission probability calculator for CUET 2026 students. Predicts cutoffs and admission chances for 1,526 DU programs.',
+  url: 'https://dreamseat.vercel.app',
+  applicationCategory: 'EducationalApplication',
+  operatingSystem: 'Any',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'INR'
+  },
+  creator: {
+    '@type': 'Person',
+    name: 'Raunak Pandey'
+  },
+  inLanguage: 'en-IN',
+  about: {
+    '@type': 'Thing',
+    name: 'Delhi University CUET 2026 Admissions'
+  }
+};
 
 export default function RootLayout({ children }) {
   return (
@@ -35,6 +135,10 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
       </head>
       <body>
         <UpdateNotice />
