@@ -1515,7 +1515,9 @@ function ShareResults({ payload, results, dream }) {
   <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
   <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{firstName}</div>
   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, padding: '5px 14px', borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', lineHeight: 1, letterSpacing: '0.04em' }}>{category}</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, padding: '7px 14px 6px', borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', lineHeight: 1, letterSpacing: '0.04em' }}>
+      <span style={{ display: 'inline-block', lineHeight: 1, paddingTop: '1px' }}>{category}</span>
+    </span>
     <span style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>{results.length.toLocaleString()} eligible programs</span>
   </div>
 </div>
@@ -1528,11 +1530,13 @@ function ShareResults({ payload, results, dream }) {
       <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
       <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', lineHeight: 1.3 }}>{dreamProgram}</div>
     </div>
-    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', flexShrink: 0, fontSize: '10px', fontWeight: 700, padding: '5px 12px', borderRadius: '20px', background: vBadge(dreamVerdict?.tone).bg, color: vBadge(dreamVerdict?.tone).color, border: `1px solid ${vBadge(dreamVerdict?.tone).border}`, whiteSpace: 'nowrap', lineHeight: 1 }}>
-      <span>{dreamVerdict?.emoji}</span><span>{dreamVerdict?.label}</span>
+    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px', flexShrink: 0, fontSize: '10px', fontWeight: 700, padding: '7px 13px 6px', borderRadius: '20px', background: vBadge(dreamVerdict?.tone).bg, color: vBadge(dreamVerdict?.tone).color, border: `1px solid ${vBadge(dreamVerdict?.tone).border}`, whiteSpace: 'nowrap', lineHeight: 1 }}>
+      <span style={{ display: 'inline-block', lineHeight: 1 }}>{dreamVerdict?.emoji}</span>
+      <span style={{ display: 'inline-block', lineHeight: 1, paddingTop: '1px' }}>{dreamVerdict?.label}</span>
     </div>
   </div>
-                  {/* Probability hero — horizontal layout (html2canvas-safe) */}
+
+{/* Probability hero — horizontal layout (html2canvas-safe) */}
 <div style={{
   display: 'flex',
   alignItems: 'stretch',
@@ -1545,7 +1549,7 @@ function ShareResults({ payload, results, dream }) {
   {/* Left: the big number */}
   <div style={{
     flex: '0 0 auto',
-    padding: '18px 22px',
+    padding: '22px 22px 18px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
@@ -1553,14 +1557,16 @@ function ShareResults({ payload, results, dream }) {
     borderRight: '1px solid rgba(255,255,255,0.18)',
   }}>
     <div style={{
+      display: 'flex',
+      alignItems: 'flex-start',
       fontFamily: "'Inter', system-ui, sans-serif",
       fontWeight: 800,
-      fontSize: '54px',
       color: '#ffffff',
-      lineHeight: 1,
+      lineHeight: 0.9,
       letterSpacing: '-0.03em',
     }}>
-      {dreamP}<span style={{ fontSize: '32px', fontWeight: 700, marginLeft: '2px' }}>%</span>
+      <span style={{ fontSize: '54px', lineHeight: 0.9 }}>{dreamP}</span>
+      <span style={{ fontSize: '32px', fontWeight: 700, marginLeft: '2px', lineHeight: 0.9, paddingTop: '6px' }}>%</span>
     </div>
     <div style={{
       fontSize: '10px',
@@ -1568,19 +1574,21 @@ function ShareResults({ payload, results, dream }) {
       letterSpacing: '0.14em',
       textTransform: 'uppercase',
       color: 'rgba(255,255,255,0.75)',
-      marginTop: '4px',
+      marginTop: '10px',
     }}>
       admission chance
     </div>
   </div>
 
-  {/* Right: contextual readout */}
+  {/* Right: contextual readout — centered */}
   <div style={{
     flex: 1,
     padding: '18px 20px',
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'center',
     justifyContent: 'center',
+    textAlign: 'center',
     minWidth: 0,
   }}>
     <div style={{
@@ -1589,26 +1597,22 @@ function ShareResults({ payload, results, dream }) {
       letterSpacing: '0.14em',
       textTransform: 'uppercase',
       color: 'rgba(255,255,255,0.7)',
-      marginBottom: '6px',
+      marginBottom: '8px',
     }}>
       verdict
     </div>
     <div style={{
-      fontSize: '18px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+      fontSize: '20px',
       fontWeight: 800,
       color: '#ffffff',
       lineHeight: 1.15,
       letterSpacing: '-0.01em',
     }}>
-      {dreamVerdict?.emoji} {dreamVerdict?.label}
-    </div>
-    <div style={{
-      fontSize: '11px',
-      color: 'rgba(255,255,255,0.8)',
-      marginTop: '6px',
-      lineHeight: 1.4,
-    }}>
-      Based on your composite of {dream.yourComposite?.toFixed(1)}
+      <span>{dreamVerdict?.emoji}</span><span>{dreamVerdict?.label}</span>
     </div>
   </div>
 </div>
