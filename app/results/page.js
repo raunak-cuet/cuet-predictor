@@ -494,7 +494,7 @@ function BigVerdictBlock({ r, category, showSeats, urSeats }) {
     safe:  'from-emerald-500 to-green-600',
     good:  'from-blue-500 to-indigo-600',
     mid:   'from-amber-500 to-orange-600',
-    risk:  'from-orange-500 to-red-600',
+    risk: 'from-orange-500 to-red-600',
     reach: 'from-rose-500 to-red-700',
     unknown: 'from-slate-400 to-slate-600'
   }[tone];
@@ -1039,24 +1039,13 @@ function FactorReveal({ r }) {
 
 /* =====================================================================
    estimatePercentile — calibrated against real NTA CUET 2026 data points.
-   Uses a piecewise power curve based on actual score/max ratios:
-     216.07 / 244.04 = 0.8854 → 99.6276 (English)
-     228.02 / 249.57 = 0.9136 → 99.0509 (Bus Stud) — outlier
-     234.96 / 249.54 = 0.9416 → 99.6340 (Economics)
-     219.43 / 242.40 = 0.9052 → 99.9558 (Maths)
-     194.41 / 212.65 = 0.9142 → 99.9747 (GAT)
-   Different subjects have different curve steepness (Maths/GAT are
-   steeper than language/domain), so we treat ratio bands non-linearly.
    ===================================================================== */
 function estimatePercentile(score, max, appeared) {
   if (!score || !max) return null;
-  const r = score / max;             // 0..1
+  const r = score / max;
   if (r >= 1.0)   return 100;
   if (r <= 0)     return 0;
 
-  // Calibrated piecewise curve — anchored on real NTA CUET 2026 data points
-  // (English 0.8854 → 99.6276, Eco 0.9416 → 99.6340, Maths 0.9052 → 99.9558,
-  // GAT 0.9142 → 99.9747, BSt 0.9137 → 99.0509).
   let p;
   if (r >= 0.97)      p = 99.99;
   else if (r >= 0.94) p = 99.85 + (r - 0.94) * (0.14 / 0.03);
@@ -1072,14 +1061,9 @@ function estimatePercentile(score, max, appeared) {
   else if (r >= 0.25) p = 15.00 + (r - 0.25) * (25.0 / 0.15);
   else                p = Math.max(0.5, r * 60);
 
-  // Subject-cohort adjustment: subjects with smaller appeared cohorts
-  // (Maths 4L, GAT 6.75L) have steeper top tails — a given ratio implies
-  // higher percentile than a big-cohort subject (English 9.14L).
-  // Boost is only meaningful at the very top (r > 0.85).
   if (appeared && r > 0.85) {
-    const refSize = 900000;          // English-class large cohort
+    const refSize = 900000;
     const tightness = Math.log10(refSize / Math.max(appeared, 50000));
-    // tightness ≈ +0.35 for Maths, +0.13 for GAT, ~0 for English
     const boost = Math.max(0, tightness) * (r - 0.85) * 1.5;
     p = Math.min(99.99, p + boost);
   }
@@ -1094,12 +1078,9 @@ function simulate(r, delta) {
   const margin = newScore - proj.mostLikely;
   const sigma = proj.sigma;
 
-  // k = ln(3) / sigma — mathematically derived (P(+σ) ≈ 75%, P(0) = 50%, P(-σ) ≈ 25%)
-  // No free parameters. No elite floor hacks. The logistic IS the model.
   const LN3 = 1.09861228867;
   let k = LN3 / sigma;
 
-  // Seat-scarcity sharpening: tiny pools → steeper curve
   const seats = r.probability.seatsConsidered;
   if (seats && seats > 0) {
     const seatAdj = Math.sqrt(40 / Math.max(seats, 5));
@@ -1116,14 +1097,13 @@ function toneToBar(t) {
 }
 
 /* ============================================================
-   AIR CALCULATOR — students enter exact NTA percentiles → instant AIR
+   AIR CALCULATOR
    ============================================================ */
 function AirCalculator({ payload }) {
   const codes = (payload.subjectsTaken && payload.subjectsTaken.length)
     ? payload.subjectsTaken
     : Object.keys(payload.scores || {});
 
-  // Build initial state — one numeric percentile per subject (blank by default)
   const [percentiles, setPercentiles] = useState(
     Object.fromEntries(codes.map(c => [c, '']))
   );
@@ -1136,9 +1116,6 @@ function AirCalculator({ payload }) {
     setPercentiles(p => ({ ...p, [code]: val }));
   };
 
-  // For each subject: AIR = (100 - percentile)/100 × appeared.
-  // Confidence band: NTA truncates percentile to 7 decimals, so for any
-  // shown value the true rank lies within ±5 of the central estimate.
   const items = codes.map(code => {
     const s = SUBJECT_STATS[code];
     const subj = SUBJECT_BY_CODE[code];
@@ -1149,7 +1126,6 @@ function AirCalculator({ payload }) {
     let air = null, airLow = null, airHigh = null;
     if (pct != null && !Number.isNaN(pct) && appeared) {
       air = Math.max(1, Math.round((100 - pct) / 100 * appeared));
-      // Confidence band: assume ±0.005 percentile precision uncertainty
       const lowP  = Math.min(100, pct + 0.005);
       const highP = Math.max(0,   pct - 0.005);
       airLow  = Math.max(1, Math.round((100 - lowP)  / 100 * appeared));
@@ -1160,7 +1136,6 @@ function AirCalculator({ payload }) {
 
   const anyFilled = items.some(it => it.pct != null);
 
-  // Subject-tier band for visual chip
   const airBand = (air) => {
     if (air == null) return null;
     if (air <= 100)    return { label: 'Top 100',     tone: 'safe' };
@@ -1174,7 +1149,6 @@ function AirCalculator({ payload }) {
 
   return (
     <section className="card-solid p-6 sm:p-8 relative overflow-hidden">
-      {/* Soft brand wash */}
       <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-br from-cyan-200 to-indigo-200 blur-3xl opacity-30 pointer-events-none" />
 
       <div className="relative">
@@ -1188,7 +1162,6 @@ function AirCalculator({ payload }) {
           </p>
         </div>
 
-        {/* Input rows */}
         <div className="grid sm:grid-cols-2 gap-2.5">
           {items.map(it => (
             <div key={it.code} className="rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2.5 min-w-0">
@@ -1209,7 +1182,6 @@ function AirCalculator({ payload }) {
                     ${it.pct != null ? 'border-indigo-300 bg-indigo-50/40 text-indigo-900 font-semibold' : 'border-slate-200'}`}
                 />
               </div>
-              {/* AIR output (renders only when filled) */}
               {it.pct != null && it.air != null && (
                 <div className="mt-2.5 pt-2.5 border-t border-slate-200 flex items-center justify-between gap-2">
                   <div className="text-[11px] text-slate-500">All India Rank</div>
@@ -1230,7 +1202,6 @@ function AirCalculator({ payload }) {
           ))}
         </div>
 
-        {/* Helper note */}
         <div className="mt-4 rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-[12px] text-slate-600 leading-relaxed">
           <b className="text-slate-800">How this works:</b>{' '}
           AIR = (100 − your percentile) / 100 × number of candidates who appeared in that subject.
@@ -1248,12 +1219,11 @@ function AirCalculator({ payload }) {
 }
 
 /* ============================================================
-   IMPORTANT DISCLAIMER — full, prominent, beautifully organised
+   IMPORTANT DISCLAIMER
    ============================================================ */
 function ImportantDisclaimer() {
   return (
     <section className="disclaimer-shell">
-      {/* Header band */}
       <div className="disclaimer-header">
         <div className="disclaimer-icon">!</div>
         <div>
@@ -1263,15 +1233,12 @@ function ImportantDisclaimer() {
       </div>
 
       <div className="disclaimer-body">
-
-        {/* ----- Paragraph 1: What this is ----- */}
         <p>
           The probabilities, projected cutoffs, ranks, and admission chances shown on this platform are
           <b> estimates </b>based on historical cutoff trends, official CUET data, seat matrices, candidate pool
           statistics, category-wise competition, and other publicly available information.
         </p>
 
-        {/* ----- Paragraph 2: Not a guarantee ----- */}
         <p>
           These predictions are <b>not official</b> and should not be treated as a guarantee of admission or
           rejection. The actual cutoffs released by Delhi University may be higher or lower than our projections
@@ -1280,7 +1247,6 @@ function ImportantDisclaimer() {
           round-wise allocation changes.
         </p>
 
-        {/* ----- HIGHLIGHTED RULE — the most important thing ----- */}
         <div className="disclaimer-rule">
           <div className="disclaimer-rule-label">★ Most important</div>
           <p className="disclaimer-rule-text">
@@ -1293,7 +1259,6 @@ function ImportantDisclaimer() {
           </p>
         </div>
 
-        {/* ----- The mechanism ----- */}
         <p>
           Delhi University considers your <b>preference order</b> during seat allocation. If you place a
           lower-preference college above a college that you actually prefer, you may be allotted the lower-preference
@@ -1301,7 +1266,6 @@ function ImportantDisclaimer() {
           was sufficient for it.
         </p>
 
-        {/* ----- The safety tip in a soft callout ----- */}
         <div className="disclaimer-tip">
           <div className="disclaimer-tip-label">💡 Pro tip</div>
           <p>
@@ -1311,7 +1275,6 @@ function ImportantDisclaimer() {
           </p>
         </div>
 
-        {/* ----- Closing ----- */}
         <p className="disclaimer-closing">
           Use these predictions as <b>guidance, not as a substitute for your own preference order.</b>
           <br />
@@ -1331,13 +1294,11 @@ function ShareResults({ payload, results, dream }) {
   const [generating, setGenerating] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
   const cardRef = useRef(null);
-  const buttonRef = useRef(null);
 
   const name = payload.name || 'Student';
   const category = payload.category || 'UR';
   const firstName = name;
 
-  // Subject bars data
   const subjectBars = useMemo(() => {
     const codes = payload.subjectsTaken || Object.keys(payload.scores || {});
     return codes.map(code => {
@@ -1350,7 +1311,6 @@ function ShareResults({ payload, results, dream }) {
     }).sort((a, b) => b.score - a.score);
   }, [payload]);
 
-  // Dream score positioning math
   const dreamPos = useMemo(() => {
     if (!dream) return null;
     const proj = dream.projection;
@@ -1365,7 +1325,6 @@ function ShareResults({ payload, results, dream }) {
     return { you, low, high, outOf, pct, margin: dream.probability.margin };
   }, [dream]);
 
-  // Image generation
   const getImageFile = useCallback(async () => {
     if (!imageUrl) return null;
     try {
@@ -1434,7 +1393,6 @@ function ShareResults({ payload, results, dream }) {
   const shareText = `I just checked my DU admission chances on DreamSeat \u2014 ${dreamP}% for ${dreamCollege}! Check yours free: https://dreamseat.vercel.app`;
   const tweetText = `Just checked my DU 2026 admission chances \u2014 ${dreamP}% for ${dreamCollege}! \uD83C\uDFAF\n\nCheck yours free \uD83D\uDC47\nhttps://dreamseat.vercel.app`;
 
-  // Verdict badge colors
   const vBadge = (tone) => {
     const map = {
       safe:  { bg: '#dcfce7', color: '#166534', border: '#bbf7d0' },
@@ -1451,7 +1409,7 @@ function ShareResults({ payload, results, dream }) {
   return (
     <>
       {/* Share button */}
-      <div ref={buttonRef} className="text-center">
+      <div className="text-center">
         <button
           onClick={() => setShowModal(true)}
           className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white font-bold text-sm hover:from-indigo-700 hover:via-violet-700 hover:to-purple-700 transition-all shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.02] active:scale-[0.98]"
@@ -1465,7 +1423,7 @@ function ShareResults({ payload, results, dream }) {
         <p className="mt-2 text-[11px] text-slate-400">Get a shareable card for WhatsApp, Instagram &amp; Twitter</p>
       </div>
 
-      {/* Modal via portal — guaranteed full-screen overlay */}
+      {/* Modal via portal */}
       {showModal && createPortal(
         <div
           style={{
@@ -1483,7 +1441,7 @@ function ShareResults({ payload, results, dream }) {
             boxShadow: '0 25px 60px -12px rgba(0,0,0,0.4)',
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}>
-            {/* Header */}
+            {/* Modal header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
               <span style={{ fontWeight: 600, fontSize: '15px', color: '#0f172a' }}>Share your results</span>
               <button onClick={() => setShowModal(false)} style={{ height: '28px', width: '28px', display: 'grid', placeItems: 'center', borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#64748b' }}>&times;</button>
@@ -1502,7 +1460,7 @@ function ShareResults({ payload, results, dream }) {
                 color: '#0f172a',
                 boxSizing: 'border-box',
               }}>
-                {/* ── Header: DreamSeat logo + CUET 2026 ── */}
+                {/* ── Logo header ── */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                   <div style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif", fontStyle: 'italic', fontSize: '26px', letterSpacing: '-0.01em', lineHeight: 1 }}>
                     <span style={{ color: '#312e81' }}>Dream</span><span style={{ color: '#4f46e5' }}>Seat</span>
@@ -1510,114 +1468,152 @@ function ShareResults({ payload, results, dream }) {
                   <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8' }}>CUET 2026</span>
                 </div>
 
-{/* ── Student info ── */}
-<div style={{ marginBottom: '22px' }}>
-  <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
-  <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{firstName}</div>
-  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, padding: '7px 14px 6px', borderRadius: '20px', background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe', lineHeight: 1, letterSpacing: '0.04em' }}>
-      <span style={{ display: 'inline-block', lineHeight: 1, paddingTop: '1px' }}>{category}</span>
-    </span>
-    <span style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>{results.length.toLocaleString()} eligible programs</span>
-  </div>
-</div>
-{/* ═══════════ UNIFIED DREAM COLLEGE CARD ═══════════ */}
-<div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginBottom: '18px' }}>
-  {/* Header */}
-  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '12px' }}>
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '5px' }}>&#x2605; DREAM COLLEGE</div>
-      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
-      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', lineHeight: 1.3 }}>{dreamProgram}</div>
-    </div>
-    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px', flexShrink: 0, fontSize: '10px', fontWeight: 700, padding: '7px 13px 6px', borderRadius: '20px', background: vBadge(dreamVerdict?.tone).bg, color: vBadge(dreamVerdict?.tone).color, border: `1px solid ${vBadge(dreamVerdict?.tone).border}`, whiteSpace: 'nowrap', lineHeight: 1 }}>
-      <span style={{ display: 'inline-block', lineHeight: 1 }}>{dreamVerdict?.emoji}</span>
-      <span style={{ display: 'inline-block', lineHeight: 1, paddingTop: '1px' }}>{dreamVerdict?.label}</span>
-    </div>
-  </div>
+                {/* ── Student info ── */}
+                <div style={{ marginBottom: '22px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
+                  <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{firstName}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                    {/* UR badge — bulletproof centering via grid + lineHeight 1 + translateY nudge */}
+                    <span style={{
+                      display: 'inline-grid',
+                      placeItems: 'center',
+                      height: '24px',
+                      padding: '0 14px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      borderRadius: '20px',
+                      background: '#e0e7ff',
+                      color: '#3730a3',
+                      border: '1px solid #c7d2fe',
+                      letterSpacing: '0.04em',
+                      lineHeight: 1,
+                    }}>
+                      <span style={{ display: 'block', transform: 'translateY(-1px)' }}>{category}</span>
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>{results.length.toLocaleString()} eligible programs</span>
+                  </div>
+                </div>
 
-{/* Probability hero — horizontal layout (html2canvas-safe) */}
-<div style={{
-  display: 'flex',
-  alignItems: 'stretch',
-  background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 55%, #8b5cf6 100%)',
-  borderRadius: '14px',
-  marginBottom: '14px',
-  overflow: 'hidden',
-  boxShadow: '0 8px 20px -8px rgba(124, 58, 237, 0.5)',
-}}>
-  {/* Left: the big number */}
-  <div style={{
-    flex: '0 0 auto',
-    padding: '22px 22px 18px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    borderRight: '1px solid rgba(255,255,255,0.18)',
-  }}>
-    <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      fontFamily: "'Inter', system-ui, sans-serif",
-      fontWeight: 800,
-      color: '#ffffff',
-      lineHeight: 0.9,
-      letterSpacing: '-0.03em',
-    }}>
-      <span style={{ fontSize: '54px', lineHeight: 0.9 }}>{dreamP}</span>
-      <span style={{ fontSize: '32px', fontWeight: 700, marginLeft: '2px', lineHeight: 0.9, paddingTop: '6px' }}>%</span>
-    </div>
-    <div style={{
-      fontSize: '10px',
-      fontWeight: 700,
-      letterSpacing: '0.14em',
-      textTransform: 'uppercase',
-      color: 'rgba(255,255,255,0.75)',
-      marginTop: '10px',
-    }}>
-      admission chance
-    </div>
-  </div>
+                {/* ═══════════ UNIFIED DREAM COLLEGE CARD ═══════════ */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginBottom: '18px' }}>
+                  {/* Dream header */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '5px' }}>&#x2605; DREAM COLLEGE</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', lineHeight: 1.3 }}>{dreamProgram}</div>
+                    </div>
+                    {/* Verdict badge — bulletproof centering */}
+                    <div style={{
+                      display: 'inline-grid',
+                      gridAutoFlow: 'column',
+                      gap: '5px',
+                      placeItems: 'center',
+                      height: '26px',
+                      padding: '0 12px',
+                      flexShrink: 0,
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      borderRadius: '20px',
+                      background: vBadge(dreamVerdict?.tone).bg,
+                      color: vBadge(dreamVerdict?.tone).color,
+                      border: `1px solid ${vBadge(dreamVerdict?.tone).border}`,
+                      whiteSpace: 'nowrap',
+                      lineHeight: 1,
+                    }}>
+                      <span style={{ transform: 'translateY(-0.5px)' }}>{dreamVerdict?.emoji}</span>
+                      <span style={{ transform: 'translateY(-1px)' }}>{dreamVerdict?.label}</span>
+                    </div>
+                  </div>
 
-  {/* Right: contextual readout — centered */}
-  <div style={{
-    flex: 1,
-    padding: '18px 20px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textAlign: 'center',
-    minWidth: 0,
-  }}>
-    <div style={{
-      fontSize: '9px',
-      fontWeight: 700,
-      letterSpacing: '0.14em',
-      textTransform: 'uppercase',
-      color: 'rgba(255,255,255,0.7)',
-      marginBottom: '8px',
-    }}>
-      verdict
-    </div>
-    <div style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '6px',
-      fontSize: '20px',
-      fontWeight: 800,
-      color: '#ffffff',
-      lineHeight: 1.15,
-      letterSpacing: '-0.01em',
-    }}>
-      <span>{dreamVerdict?.emoji}</span><span>{dreamVerdict?.label}</span>
-    </div>
-  </div>
-</div>
+                  {/* ═══════ NEW PROBABILITY HERO ═══════ */}
+                  {/* Single-column centered design — forcefully positioned with translateY for pixel-perfect output */}
+                  <div style={{
+                    position: 'relative',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%)',
+                    borderRadius: '14px',
+                    marginBottom: '14px',
+                    padding: '24px 20px 22px',
+                    overflow: 'hidden',
+                    boxShadow: '0 8px 20px -8px rgba(124, 58, 237, 0.5)',
+                  }}>
+                    {/* Subtle decorative element */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-30px',
+                      right: '-30px',
+                      width: '120px',
+                      height: '120px',
+                      borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.08)',
+                    }} />
 
-                  {/* Stats 2×2 grid using flex (html2canvas-safe) */}
+                    <div style={{ position: 'relative', textAlign: 'center' }}>
+                      {/* Label on top */}
+                      <div style={{
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'rgba(255,255,255,0.8)',
+                        marginBottom: '8px',
+                      }}>
+                        Admission Chance
+                      </div>
+
+                      {/* The big number — forcefully aligned */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'center',
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                        color: '#ffffff',
+                        lineHeight: 1,
+                        letterSpacing: '-0.04em',
+                        marginBottom: '12px',
+                      }}>
+                        <span style={{
+                          fontSize: '68px',
+                          fontWeight: 800,
+                          lineHeight: 1,
+                          transform: 'translateY(2px)',
+                          display: 'inline-block',
+                        }}>{dreamP}</span>
+                        <span style={{
+                          fontSize: '36px',
+                          fontWeight: 700,
+                          lineHeight: 1,
+                          marginLeft: '4px',
+                          transform: 'translateY(-2px)',
+                          display: 'inline-block',
+                        }}>%</span>
+                      </div>
+
+                      {/* Verdict pill below — clean and centered */}
+                      <div style={{
+                        display: 'inline-grid',
+                        gridAutoFlow: 'column',
+                        gap: '6px',
+                        placeItems: 'center',
+                        height: '28px',
+                        padding: '0 14px',
+                        background: 'rgba(255,255,255,0.18)',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        borderRadius: '20px',
+                        backdropFilter: 'blur(4px)',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#ffffff',
+                        letterSpacing: '0.02em',
+                        lineHeight: 1,
+                      }}>
+                        <span style={{ transform: 'translateY(-0.5px)' }}>{dreamVerdict?.emoji}</span>
+                        <span style={{ transform: 'translateY(-1px)' }}>{dreamVerdict?.label}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats 2×2 grid */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <StatBox label="YOUR COMPOSITE" value={dream.yourComposite?.toFixed(1)} sub={`out of ${dream.outOf}`} />
@@ -1652,7 +1648,7 @@ function ShareResults({ payload, results, dream }) {
                     </span>
                   </div>
 
-                  {/* ── Subject bars inside same card ── */}
+                  {/* Subject bars */}
                   <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#64748b', marginBottom: '10px' }}>NTA SCORE vs SUBJECT MAX</div>
                     {subjectBars.map((sb, i) => {
@@ -1680,27 +1676,78 @@ function ShareResults({ payload, results, dream }) {
               </div>
             </div>
 
-            {/* Share buttons */}
-            <div style={{ padding: '14px 20px', borderTop: '1px solid #f1f5f9', background: '#fff' }}>
+            {/* ═══════ PROFESSIONAL SHARE BUTTONS ═══════ */}
+            <div style={{ padding: '16px 20px 18px', borderTop: '1px solid #f1f5f9', background: '#fff' }}>
               {generating ? (
-                <div style={{ textAlign: 'center', fontSize: '13px', color: '#64748b', padding: '12px 0' }}>Generating your card...</div>
+                <div style={{ textAlign: 'center', fontSize: '13px', color: '#64748b', padding: '14px 0' }}>
+                  <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #e2e8f0', borderTopColor: '#6366f1', borderRadius: '50%', marginRight: '8px', verticalAlign: 'middle', animation: 'spin 0.7s linear infinite' }} />
+                  Generating your card...
+                </div>
               ) : (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                    <ShareBtn label="WhatsApp" bg="#25D366" onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank'); }} disabled={!imageUrl} />
-                    <ShareBtn label="Instagram" bg="linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)" onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) downloadImage(); }} disabled={!imageUrl} />
-                    <ShareBtn label="Telegram" bg="#0088cc" onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://t.me/share/url?url=https://dreamseat.vercel.app&text=' + encodeURIComponent(shareText), '_blank'); }} disabled={!imageUrl} />
-                    <ShareBtn label="Twitter" bg="#000" onClick={async () => { const ok = await shareWithImage(tweetText); if (!ok) window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweetText), '_blank'); }} disabled={!imageUrl} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '10px' }}>
+                    <ProShareBtn
+                      label="WhatsApp"
+                      bg="#25D366"
+                      hoverBg="#1ebe5d"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Instagram"
+                      bg="linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)"
+                      hoverBg="linear-gradient(135deg, #e0842a 0%, #d65a32 25%, #cc1e3a 50%, #ba1c5c 75%, #ab1078 100%)"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) downloadImage(); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Telegram"
+                      bg="#0088cc"
+                      hoverBg="#0077b3"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://t.me/share/url?url=https://dreamseat.vercel.app&text=' + encodeURIComponent(shareText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px' }}>
-                    <ShareBtn label="Reddit" bg="#FF4500" onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://reddit.com/submit?url=https://dreamseat.vercel.app&title=' + encodeURIComponent(shareText), '_blank'); }} disabled={!imageUrl} />
-                    <ShareBtn label="Save Image" bg="#0f172a" onClick={downloadImage} disabled={!imageUrl} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                    <ProShareBtn
+                      label="Twitter"
+                      bg="#000000"
+                      hoverBg="#1a1a1a"
+                      icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(tweetText); if (!ok) window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweetText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Reddit"
+                      bg="#FF4500"
+                      hoverBg="#e63e00"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://reddit.com/submit?url=https://dreamseat.vercel.app&title=' + encodeURIComponent(shareText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Save"
+                      bg="#0f172a"
+                      hoverBg="#1e293b"
+                      icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}
+                      onClick={downloadImage}
+                      disabled={!imageUrl}
+                    />
                   </div>
-                  <p style={{ textAlign: 'center', fontSize: '10px', color: '#94a3b8', marginTop: '10px' }}>On mobile: image is attached automatically &middot; On desktop: save first, then share</p>
+                  <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '12px', lineHeight: 1.5 }}>
+                    On mobile: image auto-attaches to your message
+                    <br />
+                    On desktop: save image first, then attach when sharing
+                  </p>
                 </>
               )}
             </div>
           </div>
+          {/* Spinner animation */}
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>,
         document.body
       )}
@@ -1719,14 +1766,39 @@ function StatBox({ label, value, sub }) {
   );
 }
 
-function ShareBtn({ label, bg, onClick, disabled }) {
+/* Professional share button with icon */
+function ProShareBtn({ label, bg, hoverBg, icon, onClick, disabled }) {
+  const [hover, setHover] = useState(false);
   return (
-    <button onClick={onClick} disabled={disabled} style={{
-      padding: '11px 4px', borderRadius: '10px', border: 'none',
-      background: bg, color: '#fff', fontSize: '12px', fontWeight: 700,
-      cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1,
-      transition: 'opacity 0.15s',
-    }}>{label}</button>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '7px',
+        padding: '11px 8px',
+        borderRadius: '12px',
+        border: 'none',
+        background: hover && !disabled ? hoverBg : bg,
+        color: '#fff',
+        fontSize: '13px',
+        fontWeight: 600,
+        letterSpacing: '-0.005em',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+        transition: 'all 0.18s ease',
+        boxShadow: disabled ? 'none' : (hover ? '0 4px 12px -2px rgba(0,0,0,0.18)' : '0 2px 6px -1px rgba(0,0,0,0.1)'),
+        transform: hover && !disabled ? 'translateY(-1px)' : 'translateY(0)',
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center' }}>{icon}</span>
+      <span>{label}</span>
+    </button>
   );
 }
 
