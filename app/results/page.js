@@ -1272,7 +1272,9 @@ function ShareResults({ payload, results, dream }) {
     } catch { return null; }
   }, [imageUrl, firstName]);
 
-  const canShareFiles = typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare;
+  // Only use Web Share API on actual mobile devices — desktop users want the URL-based share
+const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const canShareFiles = isMobile && typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare;
 
   const shareWithImage = useCallback(async (text) => {
     const file = await getImageFile();
