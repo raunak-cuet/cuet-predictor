@@ -30,15 +30,92 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  // ══════════════════════════════════════════════════════════════════
+  // DEV BYPASS — Triple Ctrl+Shift+K fills everything & auto-submits
+  // ══════════════════════════════════════════════════════════════════
+  const devTapRef = useRef({ count: 0, timer: null });
+  useEffect(() => {
+    function onKey(e) {
+      if (e.ctrlKey && e.shiftKey && e.key === 'K') {
+        e.preventDefault();
+        const d = devTapRef.current;
+        d.count++;
+        clearTimeout(d.timer);
+        if (d.count >= 3) {
+          d.count = 0;
+          // Raunak's preset
+          const devSubjects = ['101', '305', '309', '319', '501'];
+          const devScores = {
+            '101': 216.0693292,
+            '305': 228.0231277,
+            '309': 234.9633378,
+            '319': 219.4287016,
+            '501': 194.4114210
+          };
+          setSubjectsTaken(devSubjects);
+          setScores(devScores);
+          setCategory('UR');
+          setName('Raunak Pandey');
+          // Dream: SSCBS BBA(FIA) — we set it after eligible programs recompute
+          setTimeout(() => {
+            const opts = eligibleProgramsForSubjects(devSubjects);
+            const dream = opts.find(o =>
+              o.label.includes('Shaheed Sukhdev') && o.label.includes('BBA')
+            ) || opts.find(o =>
+              o.label.includes('Shaheed Sukhdev') && o.label.includes('Financial')
+            );
+            if (dream) {
+              setDreamId(String(dream.id));
+              setDreamLabel(dream.label);
+              setSearchDream(dream.label);
+            }
+          }, 100);
+        } else {
+          d.timer = setTimeout(() => { d.count = 0; }, 1200);
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const dreamOptions = useMemo(() => eligibleProgramsForSubjects(subjectsTaken), [subjectsTaken]);
   const filteredDreams = useMemo(() => {
-    const q = searchDream.trim().toLowerCase();
+    const q = searchDream.trim().toLowerCase().replace(/[.,()[\]\\/&+\-]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!q) return dreamOptions;
     const tokens = q.split(/\s+/).filter(Boolean);
-    return dreamOptions.filter(d => {
-      const hay = d.label.toLowerCase();
-      return tokens.every(t => hay.includes(t));
-    });
+    // Collapse single-letter abbreviations: "b a" → "ba"
+    const abbrQ = q.replace(/\b([a-z])\s+(?=[a-z]\b)/g, '$1');
+
+    const scored = dreamOptions.map(d => {
+      const hay = d.label.toLowerCase().replace(/[.,()[\]\\/&+\-]/g, ' ').replace(/\s+/g, ' ').trim();
+      const abbrHay = hay.replace(/\b([a-z])\s+(?=[a-z]\b)/g, '$1');
+      const allIn = tokens.every(t => hay.includes(t) || abbrHay.includes(t));
+      if (!allIn) return null;
+
+      let score = 0;
+      // Exact / prefix match bonuses
+      if (hay === q || abbrHay === abbrQ) score += 1000;
+      else if (hay.startsWith(q + ' ') || abbrHay.startsWith(abbrQ + ' ')) score += 800;
+      else if (hay.startsWith(q) || abbrHay.startsWith(abbrQ)) score += 700;
+
+      // All tokens present bonus
+      score += 400;
+
+      // Token-level bonuses weighted by length
+      tokens.forEach(t => {
+        const w = Math.min(t.length, 4);
+        if (hay.includes(t)) score += 10 * w;
+      });
+
+      // Prefer shorter, more precise matches
+      score -= hay.length * 0.02;
+
+      return { d, score };
+    }).filter(Boolean);
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map(x => x.d);
   }, [searchDream, dreamOptions]);
 
   // Hard-cap rendered DOM nodes to 80 for smooth 60fps. The user can

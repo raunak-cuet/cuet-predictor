@@ -177,8 +177,11 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
   const tone = r.probability.verdict?.tone || 'unknown';
   const proj = r.projection;
   const catLabel = { UR: 'General (Unreserved)', OBC: 'OBC-NCL', SC: 'SC', ST: 'ST', EWS: 'EWS', PwBD: 'PwBD' }[category];
-  const urSeats = r.seats?.[category] ?? r.seats;
+  const catSeats = r.seats?.[category];
+  const urSeats = catSeats ?? r.seats;
   const showSeats = typeof urSeats === 'number';
+  const zeroSeats = showSeats && urSeats === 0;
+  const urSeatsFallback = zeroSeats ? (r.seats?.['UR'] ?? null) : null;
 
   // Dynamic what-if label
   const deltaLabel = whatIf === 0
@@ -195,8 +198,20 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
           <div className="font-display text-2xl sm:text-3xl text-slate-900 leading-tight">{r.college}</div>
           <div className="text-base text-slate-600 mt-0.5">{r.program}</div>
           <div className="mt-1.5 text-xs text-slate-500">
-            {catLabel} · 2026 cycle{showSeats ? ` · ${urSeats} ${category} seats available` : ''}
+            {catLabel} · 2026 cycle{showSeats && !zeroSeats ? ` · ${urSeats} ${category} seats available` : ''}
           </div>
+          {zeroSeats && (
+            <div className="mt-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+              <b>⚠️ No reserved {category} seats</b> at this college for this program.
+              {category !== 'UR' && (
+                <span> Your category ({catLabel}) does not have special reserved seats here.
+                  You will need to compete through the <b>General/Unreserved (UR)</b> category
+                  {urSeatsFallback != null ? ` (${urSeatsFallback} UR seats available)` : ''}.
+                  {category === 'PwBD' && ' PwBD candidates may also be eligible through other reserved categories if applicable.'}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <Verdict tone={tone} label={r.probability.verdict?.label} emoji={r.probability.verdict?.emoji} big />
       </div>
@@ -220,12 +235,13 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
         />
       )}
 
-      {/* 4-stat KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      {/* 5-stat KPI row — 2 cols mobile, 3 cols tablet, 5 cols desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
         <KpiTile label="Composite score" value={r.yourComposite?.toFixed(2)} sub={`out of ${r.outOf}`} tone="emerald" />
-        <KpiTile label="Est. 2026 cut-off" value={proj.mostLikely != null ? Math.round(proj.mostLikely) : null} sub={proj.mostLikely != null ? `±${Math.round(proj.sigma)} · range ${Math.round(proj.conservative)}–${Math.round(proj.aggressive)}` : `out of ${r.outOf}`} tone="indigo" />
-        <KpiTile label={`${category} seats`} value={showSeats ? urSeats : '—'} sub={showSeats ? 'this category' : 'merit-based'} tone="violet" />
-        <KpiTile label="Admission probability" value={`~${Math.round(p)}%`} sub={r.probability.verdict?.label} tone={tone} />
+        <KpiTile label="2025 cutoff (actual)" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? `Rd 1 · ${category}` : 'no data'} tone="slate" />
+        <KpiTile label="Est. 2026 cut-off" value={proj.mostLikely != null ? Math.round(proj.mostLikely) : null} sub={proj.mostLikely != null ? `±${Math.round(proj.sigma)} · ${Math.round(proj.conservative)}–${Math.round(proj.aggressive)}` : `out of ${r.outOf}`} tone="indigo" />
+        <KpiTile label={`${category} seats`} value={showSeats && !zeroSeats ? urSeats : zeroSeats ? '0' : '—'} sub={zeroSeats ? 'no reserved seats' : showSeats ? 'this category' : 'merit-based'} tone={zeroSeats ? 'risk' : 'violet'} />
+        <KpiTile label="Admission chance" value={`~${Math.round(p)}%`} sub={r.probability.verdict?.label} tone={tone} />
       </div>
 
       {/* SCORE POSITIONING vs CUT-OFF RANGE — with what-if support */}
@@ -543,11 +559,30 @@ function DreamSelector({ results, currentId, onSelect, onCancel }) {
   const filtered = useMemo(() => {
     const q = normalizeSearch(search);
     if (!q) return options;
-    const tokens = q.split(/\s+/).filter(Boolean);
-    return options.filter(o => {
+    const tokens = q.split(/\s+/).filter(t => t.length > 0);
+    const abbrQ = abbreviate(q);
+
+    const scored = options.map(o => {
       const hay = normalizeSearch(o.label);
-      return tokens.every(t => hay.includes(t));
-    });
+      const abbrHay = abbreviate(hay);
+      const allIn = tokens.every(t => hay.includes(t) || abbrHay.includes(t));
+      if (!allIn) return null;
+
+      let score = 0;
+      if (hay === q || abbrHay === abbrQ) score += 1000;
+      else if (hay.startsWith(q + ' ') || abbrHay.startsWith(abbrQ + ' ')) score += 800;
+      else if (hay.startsWith(q) || abbrHay.startsWith(abbrQ)) score += 700;
+      score += 400;
+      tokens.forEach(t => {
+        const w = Math.min(t.length, 4);
+        if (hay.includes(t)) score += 10 * w;
+      });
+      score -= hay.length * 0.02;
+      return { o, score };
+    }).filter(Boolean);
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map(x => x.o);
   }, [search, options]);
 
   const displayed = useMemo(() => filtered.slice(0, 80), [filtered]);
@@ -805,11 +840,19 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
       {/* Compact score-position mini-bar */}
       <MiniPositionBar r={r} simulatedScore={r.yourComposite + whatIf} hasShift={whatIf !== 0} />
 
-      <div className="grid grid-cols-3 gap-2 mt-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
         <SmallStat label="Composite" value={r.yourComposite?.toFixed(2)} sub={`/${r.outOf}`} />
-        <SmallStat label="Cutoff" value={r.projection.mostLikely?.toFixed(0)} sub={`±${r.projection.sigma?.toFixed(0)}`} />
+        <SmallStat label="2025 cutoff" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? `actual · /${r.outOf}` : 'n/a'} />
+        <SmallStat label="Est. 2026" value={r.projection.mostLikely?.toFixed(0)} sub={`±${r.projection.sigma?.toFixed(0)}`} />
         <SmallStat label="Margin" value={(r.probability.margin >= 0 ? '+' : '') + r.probability.margin?.toFixed(1)} positive={r.probability.margin >= 0} />
       </div>
+      {/* Zero seats warning */}
+      {r.seats && typeof r.seats[r.category] === 'number' && r.seats[r.category] === 0 && (
+        <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed">
+          ⚠️ <b>No reserved {r.category} seats</b> — you must compete via UR/General
+          {r.seats['UR'] != null ? ` (${r.seats['UR']} UR seats)` : ''}.
+        </div>
+      )}
 
       {/* What-if */}
       <div className="mt-3">
