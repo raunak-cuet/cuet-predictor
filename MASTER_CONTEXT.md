@@ -395,6 +395,8 @@ P = 1 / (1 + exp(-k × margin))
 
 4. **Step 4 — Name**: Two separate inputs — **First Name** and **Last Name / Surname** — both required (min 2 letters each). Each field validates independently, then the combined full name runs through the main validator (see §17). This split reduces fake/lazy entries significantly vs a single name field.
 
+4b. **Share Results Card**: After the dream report, a "Share My Results ✨" button opens a modal with a visually striking dark-themed card showing the student's first name, dream college verdict, top 3 programs, and safe count. The card is rendered as real DOM, captured via `html2canvas` as PNG, and can be shared to WhatsApp (pre-filled message), Twitter/X, downloaded for Instagram Stories, or copied via native share sheet on mobile.
+
 5. **Step 5 — Dream College** (optional): Searchable dropdown. Only shows programs the student is eligible for based on their subjects. Uses relevance-scored search (see §13). Renders as a portal-based dropdown that escapes all stacking contexts.
 
 6. **Submit**: POST to `/api/submit` → engine runs → results saved to Supabase + returned → stored in `sessionStorage` → redirect to `/results`.

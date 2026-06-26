@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, memo } from 'react';
+import { useEffect, useMemo, useRef, useState, memo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { SUBJECT_BY_CODE } from '@/lib/subjects';
 import { SUBJECT_STATS, CATEGORY_POOL } from '@/lib/cuet2026';
@@ -61,6 +61,14 @@ export default function ResultsPage() {
           />
         </section>
       )}
+
+      {/* ============= SHARE RESULTS CARD ============= */}
+      <ShareResults
+        name={payload.name}
+        category={payload.category}
+        results={results}
+        dream={dream}
+      />
 
       <AirCalculator payload={payload} />
 
@@ -1312,6 +1320,254 @@ function ImportantDisclaimer() {
         </p>
       </div>
     </section>
+  );
+}
+
+/* ============================================================
+   SHARE RESULTS — Viral shareable card
+   ============================================================ */
+function ShareResults({ name, category, results, dream }) {
+  const [showModal, setShowModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [imageUrl, setImageUrl] = useState(null);
+  const cardRef = useRef(null);
+
+  const firstName = (name || 'Student').split(' ')[0];
+  const top3 = useMemo(() => results.slice(0, 3), [results]);
+  const safeCount = useMemo(() => results.filter(r => (r.probability.p ?? 0) >= 75).length, [results]);
+
+  const generateImage = useCallback(async () => {
+    if (!cardRef.current) return;
+    setGenerating(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(cardRef.current, {
+        scale: 2,
+        backgroundColor: null,
+        useCORS: true,
+        logging: false,
+      });
+      const url = canvas.toDataURL('image/png');
+      setImageUrl(url);
+    } catch (e) {
+      console.error('Share card generation failed:', e);
+    }
+    setGenerating(false);
+  }, []);
+
+  useEffect(() => {
+    if (showModal) {
+      setImageUrl(null);
+      // Small delay to let DOM render
+      const t = setTimeout(generateImage, 200);
+      return () => clearTimeout(t);
+    }
+  }, [showModal, generateImage]);
+
+  const downloadImage = () => {
+    if (!imageUrl) return;
+    const a = document.createElement('a');
+    a.href = imageUrl;
+    a.download = `DreamSeat-${firstName}-Results.png`;
+    a.click();
+  };
+
+  const dreamP = dream?.probability?.p;
+  const dreamEmoji = dream?.probability?.verdict?.emoji || '';
+  const dreamCollege = dream?.college || '';
+  const dreamProgram = dream?.program || '';
+
+  const whatsappText = dream
+    ? `I just checked my DU admission chances on DreamSeat — ${Math.round(dreamP)}% for ${dreamCollege} ${dreamProgram}! Check yours free: https://dreamseat.vercel.app`
+    : `I just checked my DU admission chances on DreamSeat — ${safeCount} safe programs! Check yours free: https://dreamseat.vercel.app`;
+
+  const twitterText = dream
+    ? `Just checked my DU 2026 admission chances on @DreamSeat — ${Math.round(dreamP)}% for ${dreamCollege}! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`
+    : `Just checked my DU 2026 admission chances on @DreamSeat — ${safeCount} safe programs! 🎯\n\nCheck yours free 👇\nhttps://dreamseat.vercel.app`;
+
+  const verdictColor = (tone) => ({
+    safe: '#10b981', good: '#3b82f6', mid: '#f59e0b', risk: '#fb923c', reach: '#ef4444'
+  }[tone] || '#94a3b8');
+
+  const verdictBg = (tone) => ({
+    safe: 'rgba(16,185,129,0.15)', good: 'rgba(59,130,246,0.15)', mid: 'rgba(245,158,11,0.15)',
+    risk: 'rgba(251,146,60,0.15)', reach: 'rgba(239,68,68,0.15)'
+  }[tone] || 'rgba(148,163,184,0.15)');
+
+  return (
+    <>
+      {/* Share button */}
+      <div className="text-center">
+        <button
+          onClick={() => setShowModal(true)}
+          className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white font-bold text-sm hover:from-violet-700 hover:via-purple-700 hover:to-fuchsia-700 transition-all shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          Share My Results ✨
+        </button>
+        <p className="mt-2 text-[11px] text-slate-400">Get a shareable card for WhatsApp, Instagram & Twitter</p>
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+              <h3 className="font-semibold text-slate-900">Share your results</h3>
+              <button onClick={() => setShowModal(false)} className="h-7 w-7 grid place-items-center rounded-full hover:bg-slate-100 text-slate-500 text-sm">✕</button>
+            </div>
+
+            {/* Card preview */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* The actual card that gets captured */}
+              <div ref={cardRef} style={{
+                width: '440px',
+                maxWidth: '100%',
+                margin: '0 auto',
+                background: 'linear-gradient(145deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)',
+                borderRadius: '20px',
+                padding: '28px 24px',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                color: 'white',
+                position: 'relative',
+                overflow: 'hidden',
+              }}>
+                {/* Decorative orbs */}
+                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '160px', height: '160px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.3), transparent 70%)' }} />
+                <div style={{ position: 'absolute', bottom: '-30px', left: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(6,182,212,0.2), transparent 70%)' }} />
+
+                {/* Logo area */}
+                <div style={{ position: 'relative', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                    <span style={{ color: '#e879a0' }}>Dream</span><span style={{ color: '#d4a574' }}>Seat</span>
+                  </div>
+                  <span style={{ fontSize: '9px', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>CUET 2026</span>
+                </div>
+
+                {/* Student name */}
+                <div style={{ position: 'relative', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>Predictions for</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: 'white', lineHeight: 1.1, marginTop: '4px' }}>{firstName}</div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: 'rgba(99,102,241,0.25)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}>{category}</span>
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>{results.length} eligible programs</span>
+                  </div>
+                </div>
+
+                {/* Dream college (if exists) */}
+                {dream && (
+                  <div style={{ position: 'relative', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '14px', padding: '14px 16px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '9px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#fbbf24', fontWeight: 700, marginBottom: '6px' }}>★ DREAM COLLEGE</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'white', lineHeight: 1.3 }}>{dreamCollege}</div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', marginTop: '2px' }}>{dreamProgram}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                      <span style={{ fontSize: '28px', fontWeight: 800, color: verdictColor(dream.probability?.verdict?.tone), lineHeight: 1 }}>~{Math.round(dreamP)}%</span>
+                      <span style={{ fontSize: '12px', padding: '3px 10px', borderRadius: '20px', background: verdictBg(dream.probability?.verdict?.tone), color: verdictColor(dream.probability?.verdict?.tone), fontWeight: 600 }}>{dreamEmoji} {dream.probability?.verdict?.label}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top 3 programs */}
+                <div style={{ position: 'relative', marginBottom: '20px' }}>
+                  <div style={{ fontSize: '9px', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 700, marginBottom: '10px' }}>TOP 3 MOST LIKELY</div>
+                  {top3.map((r, i) => {
+                    const p = r.probability.p ?? 0;
+                    const tone = r.probability.verdict?.tone || 'unknown';
+                    return (
+                      <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: i < 2 ? '8px' : '0', padding: '8px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', width: '16px', flexShrink: 0 }}>#{i + 1}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.college}</div>
+                          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.program}</div>
+                        </div>
+                        <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 800, color: verdictColor(tone), lineHeight: 1 }}>{Math.round(p)}%</div>
+                          <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)' }}>{r.probability.verdict?.emoji}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Stats row */}
+                <div style={{ position: 'relative', display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                  <div style={{ flex: 1, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: '#10b981' }}>{safeCount}</div>
+                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Safe (75%+)</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '10px 12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: '#6366f1' }}>{results.length}</div>
+                    <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Total Eligible</div>
+                  </div>
+                </div>
+
+                {/* Footer CTA */}
+                <div style={{ position: 'relative', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                    Check your real admission probability at your dream college free
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#a78bfa', marginTop: '4px' }}>
+                    dreamseat.vercel.app
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Share actions */}
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50">
+              {generating ? (
+                <div className="text-center text-sm text-slate-500 py-2">
+                  <span className="inline-block animate-spin mr-2">⏳</span> Generating your card...
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button onClick={downloadImage} disabled={!imageUrl}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-40 transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download
+                  </button>
+                  <a href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#25D366] text-white text-xs font-semibold hover:bg-[#1ebe57] transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 0 0 .611.611l4.458-1.495A11.933 11.933 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.396 0-4.612-.77-6.42-2.076l-.253-.183-3.237 1.085 1.085-3.237-.183-.253A9.955 9.955 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                    WhatsApp
+                  </a>
+                  <a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterText)}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-black text-white text-xs font-semibold hover:bg-gray-800 transition-colors">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    Twitter / X
+                  </a>
+                  <button
+                    onClick={async () => {
+                      if (imageUrl && navigator.share && /Mobi/i.test(navigator.userAgent)) {
+                        try {
+                          const res = await fetch(imageUrl);
+                          const blob = await res.blob();
+                          const file = new File([blob], 'DreamSeat-Results.png', { type: 'image/png' });
+                          await navigator.share({ files: [file], title: 'My DreamSeat Results' });
+                        } catch {}
+                      } else {
+                        try {
+                          await navigator.clipboard.writeText('https://dreamseat.vercel.app');
+                          alert('Link copied! Paste it anywhere.');
+                        } catch { alert('https://dreamseat.vercel.app'); }
+                      }
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-orange-500 text-white text-xs font-semibold hover:from-pink-600 hover:to-orange-600 transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    {/Mobi/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '') ? 'More' : 'Copy Link'}
+                  </button>
+                </div>
+              )}
+              <p className="text-center text-[10px] text-slate-400 mt-2.5">Download the image to share on Instagram Stories</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
