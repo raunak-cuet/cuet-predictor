@@ -45,10 +45,7 @@ export default function ResultsPage() {
   return (
     <div className="space-y-10 animate-in">
       <ResultsHero name={payload.name} category={payload.category} totalEligible={results.length} persisted={response?.persisted} />
-
-      {/* Subject score breakdown — VISUAL */}
       <SubjectBreakdown payload={payload} />
-
       {dream && (
         <section>
           <SectionDivider label="★ Your dream college" color="amber" />
@@ -62,23 +59,17 @@ export default function ResultsPage() {
           />
         </section>
       )}
-
-      {/* ============= SHARE RESULTS CARD ============= */}
       <ShareResults
         payload={payload}
         results={results}
         dream={dream}
       />
-
       <AirCalculator payload={payload} />
-
       <ImportantDisclaimer />
-
       <section>
         <SectionDivider label="All eligible programs" color="indigo" />
         <AllResults results={results} dreamId={dream?.id} />
       </section>
-
       <DisclaimerCard />
     </div>
   );
@@ -109,7 +100,7 @@ function ResultsHero({ name, category, totalEligible, persisted }) {
 }
 
 /* ============================================================
-   SUBJECT BREAKDOWN  (NEW — fully visual)
+   SUBJECT BREAKDOWN
    ============================================================ */
 function SubjectBreakdown({ payload }) {
   const codes = payload.subjectsTaken || Object.keys(payload.scores || {});
@@ -135,7 +126,6 @@ function SubjectBreakdown({ payload }) {
         {items.map(it => (
           <SubjectCard key={it.code} item={it} />
         ))}
-        {/* TOTAL card */}
         <div className="card-solid p-4 ring-2 ring-emerald-400 bg-gradient-to-br from-emerald-50 to-white">
           <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Total composite</div>
           <div className="font-display text-4xl text-emerald-700 leading-none mt-1 tabular-nums">{totalScore.toFixed(2)}</div>
@@ -177,7 +167,7 @@ function SubjectCard({ item }) {
 }
 
 /* ============================================================
-   DREAM REPORT — full visual report (like Claude's example)
+   DREAM REPORT
    ============================================================ */
 function DreamReport({ r, category, results, editingDream, setEditingDream, onChangeDream }) {
   const [whatIf, setWhatIf] = useState(0);
@@ -191,7 +181,6 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
   const zeroSeats = showSeats && urSeats === 0;
   const urSeatsFallback = zeroSeats ? (r.seats?.['UR'] ?? null) : null;
 
-  // Dynamic what-if label
   const deltaLabel = whatIf === 0
     ? null
     : whatIf > 0
@@ -200,7 +189,6 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
 
   return (
     <div className="card-solid p-6 sm:p-8 ring-2 ring-amber-300 shadow-[0_24px_60px_-20px_rgba(245,158,11,0.35)]">
-      {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-6">
         <div className="min-w-0">
           <div className="font-display text-2xl sm:text-3xl text-slate-900 leading-tight">{r.college}</div>
@@ -224,7 +212,6 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
         <Verdict tone={tone} label={r.probability.verdict?.label} emoji={r.probability.verdict?.emoji} big />
       </div>
 
-      {/* Change dream college */}
       {!editingDream && (
         <button
           onClick={() => setEditingDream(true)}
@@ -243,7 +230,6 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
         />
       )}
 
-      {/* 5-stat KPI row — 2 cols mobile, 3 cols tablet, 5 cols desktop */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
         <KpiTile label="Composite score" value={r.yourComposite?.toFixed(2)} sub={`out of ${r.outOf}`} tone="emerald" />
         <KpiTile label="2025 cutoff (actual)" value={r.cutoff2025 != null ? Math.round(r.cutoff2025) : '—'} sub={r.cutoff2025 != null ? `Rd 1 · ${category}` : 'no data'} tone="slate" />
@@ -252,10 +238,8 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
         <KpiTile label="Admission chance" value={`~${Math.round(p)}%`} sub={r.probability.verdict?.label} tone={tone} />
       </div>
 
-      {/* SCORE POSITIONING vs CUT-OFF RANGE — with what-if support */}
       <ScorePositionBar r={r} whatIf={whatIf} />
 
-      {/* What-if slider — right below the positioning bar */}
       <div className="mt-3">
         <div className="flex justify-between items-center text-sm mb-1.5">
           <span className="font-semibold text-indigo-900">
@@ -279,19 +263,13 @@ function DreamReport({ r, category, results, editingDream, setEditingDream, onCh
         </div>
       </div>
 
-      {/* Two-column: bars + percentiles */}
       <div className="grid lg:grid-cols-2 gap-4 mt-4">
         <SubjectBars r={r} />
         <PercentilePanel r={r} />
       </div>
 
-      {/* Big verdict block */}
       <BigVerdictBlock r={r} category={catLabel} showSeats={showSeats} urSeats={urSeats} />
-
-      {/* Key uncertainties */}
       <UncertaintyNote r={r} />
-
-      {/* Factor reveal */}
       <FactorReveal r={r} />
     </div>
   );
@@ -310,13 +288,11 @@ function ScorePositionBar({ r, whatIf = 0 }) {
   const displayScore = you + whatIf;
   const hasShift = whatIf !== 0;
 
-  // Display range — accommodate slider extremes
   const dispMin = Math.min(700, you - 60, low - 60, displayScore - 20);
   const dispMax = Math.max(outOf, displayScore + 20);
   const range = dispMax - dispMin;
   const pct = (v) => Math.max(0, Math.min(100, ((v - dispMin) / range) * 100));
 
-  // Decide which label goes on top vs bottom row to avoid overlap
   const youX = pct(displayScore);
   const bandX = pct((low + high) / 2);
   const labelsOverlap = Math.abs(youX - bandX) < 18;
@@ -328,7 +304,6 @@ function ScorePositionBar({ r, whatIf = 0 }) {
         <div className="text-[10px] text-slate-400">scale: {dispMin.toFixed(0)} – {dispMax}</div>
       </div>
 
-      {/* Labels ABOVE the bar */}
       <div className="relative h-8 mt-2">
         <Tag x={bandX} color="amber" level={labelsOverlap && youX < bandX ? 'high' : 'low'}>est. cut-off range</Tag>
         <Tag x={youX}  color={hasShift ? 'indigo' : 'emerald'} level={labelsOverlap && youX >= bandX ? 'high' : 'low'}>
@@ -336,36 +311,29 @@ function ScorePositionBar({ r, whatIf = 0 }) {
         </Tag>
       </div>
 
-      {/* The bar itself */}
       <div className="relative h-7">
-        {/* Track */}
         <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-200 rounded-full -translate-y-1/2" />
-        {/* Cut-off band */}
         <div
           className="absolute top-1/2 h-3 -translate-y-1/2 rounded-full bg-gradient-to-r from-amber-300 to-amber-500"
           style={{ left: `${pct(low)}%`, width: `${Math.max(2, pct(high) - pct(low))}%` }}
           title={`Estimated cutoff band: ${low}–${high}`}
         />
-        {/* Range-end ticks on the cutoff band */}
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(low)}%`, height: '18px' }}>
           <div className="w-0.5 h-full bg-amber-700 rounded-full" />
         </div>
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(high)}%`, height: '18px' }}>
           <div className="w-0.5 h-full bg-amber-700 rounded-full" />
         </div>
-        {/* Ghost dot at original score (only when shifted) */}
         {hasShift && (
           <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(you)}%` }}>
             <div className="h-4 w-4 rounded-full bg-emerald-300 ring-2 ring-white opacity-40" />
           </div>
         )}
-        {/* Live dot at current (maybe simulated) score */}
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out" style={{ left: `${youX}%` }}>
           <div className={`h-5 w-5 rounded-full ${hasShift ? 'bg-indigo-500 ring-indigo-200' : 'bg-emerald-500'} ring-4 ring-white shadow-lg`} />
         </div>
       </div>
 
-      {/* Numeric scale below the bar — aligned with actual positions */}
       <div className="relative mt-2 h-4 text-[10px] font-mono tabular-nums">
         <span className="absolute left-0 text-slate-400">{dispMin.toFixed(0)}</span>
         <span className="absolute -translate-x-1/2 text-amber-700 font-semibold" style={{ left: `${pct(low)}%` }}>{Math.round(low)}</span>
@@ -373,7 +341,6 @@ function ScorePositionBar({ r, whatIf = 0 }) {
         <span className="absolute right-0 text-slate-400">{dispMax}</span>
       </div>
 
-      {/* Your-score numeric value, anchored under the dot */}
       <div className="relative mt-1 h-4">
         <div className="absolute -translate-x-1/2" style={{ left: `${youX}%` }}>
           <span className={`text-[11px] font-bold tabular-nums whitespace-nowrap ${hasShift ? 'text-indigo-700' : 'text-emerald-700'}`}>
@@ -384,13 +351,13 @@ function ScorePositionBar({ r, whatIf = 0 }) {
     </div>
   );
 }
+
 function Tag({ x, color, children, level = 'low' }) {
   const colors = {
     amber:   'text-amber-700 bg-amber-50 border border-amber-200',
     emerald: 'text-emerald-700 bg-emerald-50 border border-emerald-200',
     indigo:  'text-indigo-700 bg-indigo-50 border border-indigo-200'
   };
-  // Two stagger levels so close-together labels don't overlap horizontally
   const top = level === 'high' ? 0 : 18;
   return (
     <div
@@ -403,7 +370,7 @@ function Tag({ x, color, children, level = 'low' }) {
 }
 
 /* ============================================================
-   Subject bars chart  (You vs 2026 max)
+   Subject bars chart
    ============================================================ */
 function SubjectBars({ r }) {
   const items = r.breakdown.map(b => {
@@ -426,9 +393,7 @@ function SubjectBars({ r }) {
               <span className="font-mono tabular-nums text-slate-500">{it.score.toFixed(1)} <span className="text-slate-300">/ {it.max}</span></span>
             </div>
             <div className="relative h-3 bg-slate-200 rounded-full overflow-hidden">
-              {/* Max marker (lighter) */}
               <div className="absolute top-0 bottom-0 left-0 bg-slate-300 rounded-full" style={{ width: `${it.max * scale}%` }} />
-              {/* Your score (vivid) */}
               <div className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${it.score * scale}%` }} />
             </div>
           </div>
@@ -443,12 +408,9 @@ function SubjectBars({ r }) {
 }
 
 /* ============================================================
-   Percentile panel (calibrated per-subject ranks)
+   Percentile panel
    ============================================================ */
 function PercentilePanel({ r }) {
-  // Estimate per-subject percentile using a calibrated power curve anchored
-  // to real NTA 2026 score distributions. The score/max ratio is raised to
-  // a steep exponent to mirror the actual top-heavy CUET curve.
   const items = r.breakdown.map(b => {
     const s = SUBJECT_STATS[b.code];
     const max = s?.maxScore?.[2026] || s?.maxScore?.[2025] || 250;
@@ -540,13 +502,12 @@ function UncertaintyNote({ r }) {
 }
 
 /* ============================================================
-   DREAM COLLEGE SELECTOR — change dream without re-submitting
+   DREAM COLLEGE SELECTOR
    ============================================================ */
 function DreamSelector({ results, currentId, onSelect, onCancel }) {
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
 
-  // Click outside closes the selector
   useEffect(() => {
     function onClick(e) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
@@ -641,8 +602,6 @@ function DreamSelector({ results, currentId, onSelect, onCancel }) {
 /* ============================================================
    FILTER HELPERS
    ============================================================ */
-
-// Normalize text for flexible keyword matching.
 function normalizeSearch(str) {
   return (str || '')
     .toLowerCase()
@@ -651,8 +610,6 @@ function normalizeSearch(str) {
     .trim();
 }
 
-// Collapse single-letter abbreviations like "b a" → "ba" so that
-// "ba economics" matches "B.A. (Hons.) Economics".
 function abbreviate(str) {
   return str.replace(/\b([a-z])\s+(?=[a-z]\b)/g, '$1');
 }
@@ -660,7 +617,6 @@ function abbreviate(str) {
 function relevanceScore(r, q, tokens) {
   const college = normalizeSearch(r.college);
   const program = normalizeSearch(r.program);
-
   const abbrCollege = abbreviate(college);
   const abbrProgram = abbreviate(program);
   const haystack = college + ' ' + program;
@@ -668,7 +624,6 @@ function relevanceScore(r, q, tokens) {
 
   let score = 0;
 
-  // 1. Exact / prefix match bonuses
   if (college === q || abbrCollege === q) score += 1000;
   else if (program === q || abbrProgram === q) score += 900;
   else if (college.startsWith(q + ' ') || abbrCollege.startsWith(q + ' ')) score += 800;
@@ -676,19 +631,16 @@ function relevanceScore(r, q, tokens) {
   else if (program.startsWith(q + ' ') || abbrProgram.startsWith(q + ' ')) score += 650;
   else if (program.startsWith(q) || abbrProgram.startsWith(q)) score += 600;
 
-  // 2. All tokens present
   const allInFull = tokens.every(t => haystack.includes(t));
   const allInAbbr = tokens.every(t => abbrHaystack.includes(t));
   if (allInFull || allInAbbr) score += 400;
 
-  // 3. Token-level bonuses (weight by length to avoid single-letter spam)
   tokens.forEach(t => {
     const w = Math.min(t.length, 4);
     if (college.includes(t) || abbrCollege.includes(t)) score += 10 * w;
     if (program.includes(t) || abbrProgram.includes(t)) score += 6 * w;
   });
 
-  // 4. Prefer shorter, more precise matches
   if (allInFull || allInAbbr) {
     score -= (college.length + program.length) * 0.02;
   }
@@ -704,11 +656,8 @@ function AllResults({ results, dreamId }) {
   const [sort, setSort] = useState('PROB');
   const [search, setSearch] = useState('');
   const [courseFilter, setCourseFilter] = useState('ALL');
-  const [visibleCount, setVisibleCount] = useState(50);   // render-cap for performance
+  const [visibleCount, setVisibleCount] = useState(50);
 
-  // When the user starts searching, switch from Probability to Best Match
-  // so the top result is the closest text match (e.g. "shri ram college"
-  // puts SRCC above Lady Shri Ram). Restore Probability when cleared.
   useEffect(() => {
     if (search.trim() && sort === 'PROB') {
       setSort('BEST');
@@ -717,7 +666,6 @@ function AllResults({ results, dreamId }) {
     }
   }, [search, sort]);
 
-  // Extract unique course types from results
   const courseTypes = useMemo(() => {
     const types = new Set();
     for (const r of results) {
@@ -748,7 +696,6 @@ function AllResults({ results, dreamId }) {
     return scored.map(x => x.r);
   }, [results, filter, sort, search, dreamId, courseFilter]);
 
-  // Reset pagination whenever filter/sort/search change so the user sees fresh top results
   useEffect(() => { setVisibleCount(50); }, [filter, sort, search, courseFilter]);
 
   const displayed = items.slice(0, visibleCount);
@@ -845,7 +792,6 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
         <div className={`bar bar-${toneToBar(tone)}`}><div style={{ width: `${p}%` }} /></div>
       </div>
 
-      {/* Compact score-position mini-bar */}
       <MiniPositionBar r={r} simulatedScore={r.yourComposite + whatIf} hasShift={whatIf !== 0} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
@@ -854,7 +800,6 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
         <SmallStat label="Est. 2026" value={r.projection.mostLikely?.toFixed(0)} sub={`±${r.projection.sigma?.toFixed(0)}`} />
         <SmallStat label="Margin" value={(r.probability.margin >= 0 ? '+' : '') + r.probability.margin?.toFixed(1)} positive={r.probability.margin >= 0} />
       </div>
-      {/* Zero seats warning */}
       {r.seats && typeof r.seats[r.category] === 'number' && r.seats[r.category] === 0 && (
         <div className="mt-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed">
           ⚠️ <b>No reserved {r.category} seats</b> — you must compete via UR/General
@@ -862,7 +807,6 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
         </div>
       )}
 
-      {/* What-if */}
       <div className="mt-3">
         <div className="flex justify-between items-center text-xs">
           <span className="text-slate-500">What-if: {whatIf >= 0 ? '+' : ''}{whatIf} marks</span>
@@ -879,12 +823,10 @@ const ResultCard = memo(function ResultCard({ r, idx }) {
 function MiniPositionBar({ r, simulatedScore, hasShift }) {
   const proj = r.projection;
   const actualScore = r.yourComposite;
-  // Use simulated score for the moving dot; fall back to actual if not provided
   const displayScore = typeof simulatedScore === 'number' ? simulatedScore : actualScore;
   const low = proj.conservative;
   const high = proj.aggressive;
 
-  // Scale needs to accommodate slider extremes (−100 to +100), not just current values
   const dispMin = Math.min(low - 40, actualScore - 60, displayScore - 20);
   const dispMax = Math.max(high + 40, actualScore + 110, displayScore + 20);
   const range = dispMax - dispMin;
@@ -897,21 +839,17 @@ function MiniPositionBar({ r, simulatedScore, hasShift }) {
         <span className="tabular-nums">{Math.round(low)}–{Math.round(high)}</span>
       </div>
       <div className="relative h-3">
-        {/* Track */}
         <div className="absolute inset-x-0 top-1/2 h-1.5 bg-slate-200 rounded-full -translate-y-1/2" />
-        {/* Cutoff band */}
         <div
           className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-amber-400"
           style={{ left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%` }}
         />
-        {/* Range-end ticks */}
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(low)}%`, height: '12px' }}>
           <div className="w-0.5 h-full bg-amber-600 rounded-full" />
         </div>
         <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2" style={{ left: `${pct(high)}%`, height: '12px' }}>
           <div className="w-0.5 h-full bg-amber-600 rounded-full" />
         </div>
-        {/* Ghost dot at original score (only when shifted) */}
         {hasShift && (
           <div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200"
@@ -920,7 +858,6 @@ function MiniPositionBar({ r, simulatedScore, hasShift }) {
             <div className="h-3 w-3 rounded-full bg-emerald-300 ring-2 ring-white opacity-50" />
           </div>
         )}
-        {/* Live dot at current (maybe simulated) score */}
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-200 ease-out"
           style={{ left: `${pct(displayScore)}%` }}
@@ -982,6 +919,7 @@ function Verdict({ tone, label, emoji, big }) {
     </div>
   );
 }
+
 function SmallStat({ label, value, sub, positive }) {
   return (
     <div className="rounded-lg bg-slate-50/80 border border-slate-200/70 p-2 text-center">
@@ -1037,9 +975,9 @@ function FactorReveal({ r }) {
   );
 }
 
-/* =====================================================================
-   estimatePercentile — calibrated against real NTA CUET 2026 data points.
-   ===================================================================== */
+/* ============================================================
+   estimatePercentile
+   ============================================================ */
 function estimatePercentile(score, max, appeared) {
   if (!score || !max) return null;
   const r = score / max;
@@ -1408,7 +1346,6 @@ function ShareResults({ payload, results, dream }) {
 
   return (
     <>
-      {/* Share button */}
       <div className="text-center">
         <button
           onClick={() => setShowModal(true)}
@@ -1423,7 +1360,6 @@ function ShareResults({ payload, results, dream }) {
         <p className="mt-2 text-[11px] text-slate-400">Get a shareable card for WhatsApp, Instagram &amp; Twitter</p>
       </div>
 
-      {/* Modal via portal */}
       {showModal && createPortal(
         <div
           style={{
@@ -1441,15 +1377,12 @@ function ShareResults({ payload, results, dream }) {
             boxShadow: '0 25px 60px -12px rgba(0,0,0,0.4)',
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}>
-            {/* Modal header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
               <span style={{ fontWeight: 600, fontSize: '15px', color: '#0f172a' }}>Share your results</span>
               <button onClick={() => setShowModal(false)} style={{ height: '28px', width: '28px', display: 'grid', placeItems: 'center', borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '16px', color: '#64748b' }}>&times;</button>
             </div>
 
-            {/* Card preview */}
             <div style={{ padding: '16px', background: '#f8fafc', overflowX: 'auto' }}>
-              {/* ═══════════ THE SHAREABLE CARD ═══════════ */}
               <div ref={cardRef} style={{
                 width: '460px', margin: '0 auto',
                 background: '#ffffff',
@@ -1460,7 +1393,6 @@ function ShareResults({ payload, results, dream }) {
                 color: '#0f172a',
                 boxSizing: 'border-box',
               }}>
-                {/* ── Logo header ── */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                   <div style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif", fontStyle: 'italic', fontSize: '26px', letterSpacing: '-0.01em', lineHeight: 1 }}>
                     <span style={{ color: '#312e81' }}>Dream</span><span style={{ color: '#4f46e5' }}>Seat</span>
@@ -1468,12 +1400,10 @@ function ShareResults({ payload, results, dream }) {
                   <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8' }}>CUET 2026</span>
                 </div>
 
-                {/* ── Student info ── */}
                 <div style={{ marginBottom: '22px' }}>
                   <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '4px' }}>Predictions for</div>
                   <div style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: '40px', color: '#0f172a', lineHeight: 1.25, paddingBottom: '4px' }}>{firstName}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                    {/* UR badge — bulletproof centering via grid + lineHeight 1 + translateY nudge */}
                     <span style={{
                       display: 'inline-grid',
                       placeItems: 'center',
@@ -1494,16 +1424,13 @@ function ShareResults({ payload, results, dream }) {
                   </div>
                 </div>
 
-                {/* ═══════════ UNIFIED DREAM COLLEGE CARD ═══════════ */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginBottom: '18px' }}>
-                  {/* Dream header */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '14px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#d97706', marginBottom: '5px' }}>&#x2605; DREAM COLLEGE</div>
                       <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', lineHeight: 1.25 }}>{dreamCollege}</div>
                       <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', lineHeight: 1.3 }}>{dreamProgram}</div>
                     </div>
-                    {/* Verdict badge — bulletproof centering */}
                     <div style={{
                       display: 'inline-grid',
                       gridAutoFlow: 'column',
@@ -1526,8 +1453,6 @@ function ShareResults({ payload, results, dream }) {
                     </div>
                   </div>
 
-                  {/* ═══════ NEW PROBABILITY HERO ═══════ */}
-                  {/* Single-column centered design — forcefully positioned with translateY for pixel-perfect output */}
                   <div style={{
                     position: 'relative',
                     background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%)',
@@ -1537,7 +1462,6 @@ function ShareResults({ payload, results, dream }) {
                     overflow: 'hidden',
                     boxShadow: '0 8px 20px -8px rgba(124, 58, 237, 0.5)',
                   }}>
-                    {/* Subtle decorative element */}
                     <div style={{
                       position: 'absolute',
                       top: '-30px',
@@ -1549,7 +1473,6 @@ function ShareResults({ payload, results, dream }) {
                     }} />
 
                     <div style={{ position: 'relative', textAlign: 'center' }}>
-                      {/* Label on top */}
                       <div style={{
                         fontSize: '10px',
                         fontWeight: 700,
@@ -1561,7 +1484,6 @@ function ShareResults({ payload, results, dream }) {
                         Admission Chance
                       </div>
 
-                      {/* The big number — forcefully aligned */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'baseline',
@@ -1572,7 +1494,8 @@ function ShareResults({ payload, results, dream }) {
                         letterSpacing: '-0.04em',
                         marginTop: '8px',
                         marginBottom: '24px',
-                      }}>                        <span style={{
+                      }}>
+                        <span style={{
                           fontSize: '68px',
                           fontWeight: 800,
                           lineHeight: 1,
@@ -1589,7 +1512,6 @@ function ShareResults({ payload, results, dream }) {
                         }}>%</span>
                       </div>
 
-                      {/* Verdict pill below — clean and centered */}
                       <div style={{
                         display: 'inline-grid',
                         gridAutoFlow: 'column',
@@ -1613,7 +1535,6 @@ function ShareResults({ payload, results, dream }) {
                     </div>
                   </div>
 
-                  {/* Stats 2×2 grid */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <StatBox label="YOUR COMPOSITE" value={dream.yourComposite?.toFixed(1)} sub={`out of ${dream.outOf}`} />
@@ -1625,7 +1546,6 @@ function ShareResults({ payload, results, dream }) {
                     </div>
                   </div>
 
-                  {/* Score positioning bar */}
                   {dreamPos && (
                     <div style={{ marginBottom: '12px' }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#64748b', marginBottom: '8px' }}>SCORE POSITION vs CUTOFF</div>
@@ -1640,7 +1560,6 @@ function ShareResults({ payload, results, dream }) {
                     </div>
                   )}
 
-                  {/* Margin */}
                   <div style={{ textAlign: 'center', padding: '4px 0' }}>
                     <span style={{ fontSize: '12px', color: '#64748b' }}>Your margin: </span>
                     <span style={{ fontSize: '14px', fontWeight: 800, color: (dreamPos?.margin ?? 0) >= 0 ? '#059669' : '#dc2626' }}>
@@ -1648,7 +1567,6 @@ function ShareResults({ payload, results, dream }) {
                     </span>
                   </div>
 
-                  {/* Subject bars */}
                   <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#64748b', marginBottom: '10px' }}>NTA SCORE vs SUBJECT MAX</div>
                     {subjectBars.map((sb, i) => {
@@ -1668,7 +1586,6 @@ function ShareResults({ payload, results, dream }) {
                   </div>
                 </div>
 
-                {/* Footer CTA */}
                 <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.5 }}>Check your real admission probability at your dream college free {'\u2192'}</div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#4f46e5', marginTop: '3px', letterSpacing: '-0.01em' }}>dreamseat.vercel.app</div>
@@ -1685,6 +1602,104 @@ function ShareResults({ payload, results, dream }) {
                 </div>
               ) : (
                 <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '10px' }}>
+                    <ProShareBtn
+                      label="WhatsApp"
+                      bg="#ffffff"
+                      hoverBg="#f8fafc"
+                      textColor="#0f172a"
+                      border="1px solid #e2e8f0"
+                      iconColor="#25D366"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Instagram"
+                      bg="#ffffff"
+                      hoverBg="#f8fafc"
+                      textColor="#0f172a"
+                      border="1px solid #e2e8f0"
+                      iconColor="#E1306C"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) downloadImage(); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Telegram"
+                      bg="#ffffff"
+                      hoverBg="#f8fafc"
+                      textColor="#0f172a"
+                      border="1px solid #e2e8f0"
+                      iconColor="#0088cc"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://t.me/share/url?url=https://dreamseat.vercel.app&text=' + encodeURIComponent(shareText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                    <ProShareBtn
+                      label="Twitter"
+                      bg="#ffffff"
+                      hoverBg="#f8fafc"
+                      textColor="#0f172a"
+                      border="1px solid #e2e8f0"
+                      iconColor="#0f172a"
+                      icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(tweetText); if (!ok) window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(tweetText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Reddit"
+                      bg="#ffffff"
+                      hoverBg="#f8fafc"
+                      textColor="#0f172a"
+                      border="1px solid #e2e8f0"
+                      iconColor="#FF4500"
+                      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>}
+                      onClick={async () => { const ok = await shareWithImage(shareText); if (!ok) window.open('https://reddit.com/submit?url=https://dreamseat.vercel.app&title=' + encodeURIComponent(shareText), '_blank'); }}
+                      disabled={!imageUrl}
+                    />
+                    <ProShareBtn
+                      label="Save"
+                      bg="#0f172a"
+                      hoverBg="#1e293b"
+                      textColor="#ffffff"
+                      border="1px solid #0f172a"
+                      iconColor="#ffffff"
+                      icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}
+                      onClick={downloadImage}
+                      disabled={!imageUrl}
+                    />
+                  </div>
+                  <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '12px', lineHeight: 1.5 }}>
+                    On mobile: image auto-attaches to your message
+                    <br />
+                    On desktop: save image first, then attach when sharing
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+/* Helper components for share card */
+function StatBox({ label, value, sub }) {
+  return (
+    <div style={{ flex: 1, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 8px', textAlign: 'center', minWidth: 0 }}>
+      <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '3px' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '2px' }}>{sub}</div>}
+    </div>
+  );
+}
+
 /* Professional share button — clean monochrome with brand-colored icons */
 function ProShareBtn({ label, bg, hoverBg, textColor, border, iconColor, icon, onClick, disabled }) {
   const [hover, setHover] = useState(false);
@@ -1716,70 +1731,6 @@ function ProShareBtn({ label, bg, hoverBg, textColor, border, iconColor, icon, o
       }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', color: iconColor }}>{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
-}
-                  <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '12px', lineHeight: 1.5 }}>
-                    On mobile: image auto-attaches to your message
-                    <br />
-                    On desktop: save image first, then attach when sharing
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-          {/* Spinner animation */}
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>,
-        document.body
-      )}
-    </>
-  );
-}
-
-/* Helper components for share card */
-function StatBox({ label, value, sub }) {
-  return (
-    <div style={{ flex: 1, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 8px', textAlign: 'center', minWidth: 0 }}>
-      <div style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '3px' }}>{label}</div>
-      <div style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '2px' }}>{sub}</div>}
-    </div>
-  );
-}
-
-/* Professional share button with icon */
-function ProShareBtn({ label, bg, hoverBg, icon, onClick, disabled }) {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '7px',
-        padding: '11px 8px',
-        borderRadius: '12px',
-        border: 'none',
-        background: hover && !disabled ? hoverBg : bg,
-        color: '#fff',
-        fontSize: '13px',
-        fontWeight: 600,
-        letterSpacing: '-0.005em',
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        transition: 'all 0.18s ease',
-        boxShadow: disabled ? 'none' : (hover ? '0 4px 12px -2px rgba(0,0,0,0.18)' : '0 2px 6px -1px rgba(0,0,0,0.1)'),
-        transform: hover && !disabled ? 'translateY(-1px)' : 'translateY(0)',
-        fontFamily: "'Inter', system-ui, sans-serif",
-      }}
-    >
-      <span style={{ display: 'inline-flex', alignItems: 'center' }}>{icon}</span>
       <span>{label}</span>
     </button>
   );
